@@ -26,17 +26,19 @@ class AuthController extends Controller
             throw ValidationException::withMessages(['email' => 'Tu cuenta está inactiva.']);
         }
 
-        // Puedes definir abilities si quieres granularidad
         $token = $user->createToken('mobile')->plainTextToken;
 
+        // 👇 usa el $user que ya tienes, no $request->user()
+        $user->load('roles:id,name');
+
         return response()->json([
-            'token' => $token,
+            'token'      => $token,
             'token_type' => 'Bearer',
-            'user' => [
+            'user'       => [
                 'id'    => $user->id,
                 'name'  => $user->name,
                 'email' => $user->email,
-                'roles' => $user->getRoleNames(),
+                'roles' => $user->roles->pluck('name')->values()->all(), // ← array de strings
             ],
         ]);
     }

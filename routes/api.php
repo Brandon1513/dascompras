@@ -1,5 +1,7 @@
 <?php
 // routes/api.php
+use Illuminate\Http\Request;
+use App\Models\User;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ExpedienteApiController;
@@ -9,6 +11,17 @@ use App\Http\Controllers\Api\CargaExpedienteApiController;
 
 // Autenticación API (Sanctum)
 Route::post('/login',  [AuthController::class, 'login']);
+Route::middleware('auth:sanctum')->get('/me', function (Request $r) {
+    $u = $r->user()->load('roles:id,name');
+
+    return response()->json([
+        'id'    => $u->id,
+        'name'  => $u->name,
+        'email' => $u->email,
+        'roles' => $u->roles->pluck('name')->values(), // ← array de strings
+    ]);
+});
+
 
 //expedientes
 Route::middleware(['auth:sanctum','active','role:administrador|compras'])->group(function () {
