@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\EmpleadoController;
+use App\Http\Controllers\RequisicionController;
 use App\Http\Controllers\ExpedienteWebController;
 Route::get('/', function () {
     return view('welcome');
@@ -47,6 +48,14 @@ Route::post('/expedientes/{expediente}/adjuntar', [ExpedienteWebController::clas
     Route::get('/expedientes/{expediente}',   [ExpedienteWebController::class, 'show'])
         ->whereNumber('expediente') // <-- evita que “carga” coincida
         ->name('expedientes.show');
+});
+
+//requis
+
+Route::middleware(['auth'])->group(function () {
+    Route::get('/requisiciones',       [RequisicionController::class, 'index'])->name('requisiciones.index');
+    Route::get('/requisiciones/crear', [RequisicionController::class, 'create'])->name('requisiciones.create');
+    Route::get('/requisiciones/{requisicion}/editar', [RequisicionController::class, 'edit'])->name('requisiciones.edit');
 });
 
 

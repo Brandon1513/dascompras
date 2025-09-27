@@ -25,6 +25,8 @@ class User extends Authenticatable
         'password',
         'activo',
         'departamento_id',
+        'supervisor_id',
+        
     ];
 
     /**
@@ -53,5 +55,15 @@ class User extends Authenticatable
     public function departamento()
     { 
         return $this->belongsTo(Departamento::class); 
+    }
+    public function supervisor()
+    {
+        return $this->belongsTo(User::class, 'supervisor_id');
+    }
+
+    // Relación con los subordinados del usuario
+    public function subordinates()
+    {
+        return $this->hasMany(User::class, 'supervisor_id');
     }
 }

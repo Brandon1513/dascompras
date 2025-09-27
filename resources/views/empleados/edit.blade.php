@@ -39,6 +39,19 @@
             </select>
             @error('departamento_id') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
           </div>
+          <div class="mt-4">
+            <label class="block text-sm font-medium">Supervisor (Jefe)</label>
+            <select name="supervisor_id" class="w-full border-gray-300 rounded">
+                <option value="">— Sin supervisor —</option>
+                @foreach ($jefes as $j)
+                    <option value="{{ $j->id }}" @selected(old('supervisor_id', $user->supervisor_id) == $j->id)>
+                        {{ $j->name }}
+                    </option>
+                @endforeach
+            </select>
+            @error('supervisor_id') <p class="text-sm text-red-600">{{ $message }}</p> @enderror
+          </div>
+
 
           {{-- Roles (checks) --}}
           <div>
