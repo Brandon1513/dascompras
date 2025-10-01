@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Livewire\Requisiciones\Recibir;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\EmpleadoController;
 use App\Http\Controllers\RequisicionController;
@@ -56,6 +57,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/requisiciones',       [RequisicionController::class, 'index'])->name('requisiciones.index');
     Route::get('/requisiciones/crear', [RequisicionController::class, 'create'])->name('requisiciones.create');
     Route::get('/requisiciones/{requisicion}/editar', [RequisicionController::class, 'edit'])->name('requisiciones.edit');
+     Route::get('/requisiciones/{requisicion}', [RequisicionController::class,'show'])
+        ->name('requisiciones.show');
+        Route::get('/requisiciones/{requisicion}/recibir', Recibir::class)
+        ->name('requisiciones.recibir');
 });
 
 

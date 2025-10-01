@@ -24,6 +24,7 @@
                             @endforeach
                         </select>
                     </div>
+                    @role('administrador|compras|gerente_area|gerencia_adm|direccion|jefe')
                     <div>
                         <label class="block text-sm font-medium">Solicitante</label>
                         <select name="solicitante" class="w-full mt-1 border-gray-300 rounded">
@@ -33,6 +34,7 @@
                             @endforeach
                         </select>
                     </div>
+                    @endrole
                     <div class="flex gap-2">
                         <button class="px-4 py-2 mt-6 bg-gray-200 rounded hover:bg-gray-300">Aplicar</button>
                         <a href="{{ route('requisiciones.index') }}" class="px-4 py-2 mt-6 bg-white border rounded hover:bg-gray-50">Limpiar</a>
@@ -58,24 +60,61 @@
                         </thead>
                         <tbody class="divide-y divide-gray-100">
                             @foreach ($requisiciones as $r)
+                                @php
+                                    // ¿me toca firmar?
+                                    $ap = $r->aprobacionPendientePara($user);
+
+                                    // classes del chip por estado
+                                    $chip = match($r->estado) {
+                                        'borrador'        => 'border-gray-300 text-gray-700',
+                                        'enviada'         => 'border-sky-300 text-sky-700',
+                                        'en_aprobacion'   => 'border-amber-300 text-amber-700',
+                                        'rechazada'       => 'border-rose-300 text-rose-700',
+                                        'aprobada_final'  => 'border-emerald-300 text-emerald-700',
+                                        'recibida'        => 'border-indigo-300 text-indigo-700',
+                                        'cancelada'       => 'border-gray-300 text-gray-500',
+                                        default           => 'border-gray-300 text-gray-700',
+                                    };
+                                @endphp
+
                                 <tr>
-                                    <td class="px-3 py-2">{{ $r->folio }}</td>
+                                    <td class="px-3 py-2">
+                                        <a href="{{ route('requisiciones.show', $r) }}" class="hover:underline">
+                                            {{ $r->folio }}
+                                        </a>
+                                    </td>
                                     <td class="px-3 py-2">{{ \Illuminate\Support\Carbon::parse($r->fecha_emision)->format('Y-m-d') }}</td>
                                     <td class="px-3 py-2">{{ $r->solicitante?->name }}</td>
                                     <td class="px-3 py-2">{{ $r->departamentoRef?->nombre ?? '—' }}</td>
                                     <td class="px-3 py-2">
-                                        <span class="px-2 py-0.5 rounded text-xs border">
+                                        <span class="px-2 py-0.5 rounded text-xs border {{ $chip }}">
                                             {{ str_replace('_',' ', $r->estado) }}
                                         </span>
                                     </td>
                                     <td class="px-3 py-2 text-right">${{ number_format($r->total,2) }}</td>
-                                    <td class="px-3 py-2 text-right">
-                                        @if ($r->estado === 'borrador' && $r->solicitante_id === auth()->id())
-                                            <a href="{{ route('requisiciones.edit', $r) }}" class="text-indigo-600 hover:text-indigo-800">Continuar edición</a>
+
+                                    <td class="px-3 py-2 text-right space-x-3">
+                                        @can('approve', $r)
+                                            <a href="{{ route('requisiciones.show', $r) }}" class="text-indigo-600 hover:underline">
+                                                Revisar / Aprobar
+                                            </a>
+                                        @elsecan('update', $r)
+                                            <a href="{{ route('requisiciones.edit', $r) }}" class="text-indigo-600 hover:underline">
+                                                Continuar edición
+                                            </a>
+                                        @elsecan('receive', $r)
+                                            <a href="{{ route('requisiciones.recibir', $r) }}" class="text-indigo-600 hover:underline">
+                                                Registrar recepción
+                                            </a>
+                                        @elsecan('view', $r)
+                                            <a href="{{ route('requisiciones.show', $r) }}" class="text-gray-600 hover:underline">
+                                                Ver
+                                            </a>
                                         @else
                                             <span class="text-gray-400">—</span>
-                                        @endif
+                                        @endcan
                                     </td>
+
                                 </tr>
                             @endforeach
                         </tbody>

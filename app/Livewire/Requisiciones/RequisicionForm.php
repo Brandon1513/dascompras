@@ -2,14 +2,18 @@
 
 namespace App\Livewire\Requisiciones;
 
+use App\Models\User;
 use Livewire\Component;
+use App\Models\Aprobacion;
 use App\Models\Requisicion;
-use App\Models\RequisicionItem;
 use App\Models\Departamento;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
+use App\Models\NivelAprobacion;
+use App\Models\RequisicionItem;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Validation\ValidationException;
 use Livewire\Features\SupportRedirects\Redirector;
 
 class RequisicionForm extends Component
@@ -35,7 +39,7 @@ class RequisicionForm extends Component
 
     public const IVA_RATE = 0.16;
 
-    // Para selects (como array simple para evitar serializar modelos en Livewire)
+    // Para selects
     public array $departamentos = [];
 
     public function mount(?int $requisicionId = null): void
@@ -43,7 +47,6 @@ class RequisicionForm extends Component
         $this->fecha_emision      = now()->toDateString();
         $this->solicitante_nombre = Auth::user()?->name ?? '';
 
-        // Pasar a array (id, nombre) para Livewire
         $this->departamentos = Departamento::orderBy('nombre')
             ->get(['id','nombre'])
             ->map(fn ($d) => ['id' => $d->id, 'nombre' => $d->nombre])
@@ -155,8 +158,7 @@ class RequisicionForm extends Component
             'items.*.unidad'          => ['nullable', 'string', 'max:20'],
             'items.*.cantidad'        => ['required', 'numeric', 'gt:0'],
             'items.*.precio_unitario' => ['required', 'numeric', 'gte:0'],
-            // Si prefieres validar formato URL, cambia 'string' por 'url'
-            'items.*.link_compra'     => ['nullable', 'string', 'max:255'],
+            'items.*.link_compra'     => ['nullable', 'string', 'max:255'], // usa 'url' si quieres forzar formato
         ];
     }
 
@@ -178,7 +180,8 @@ class RequisicionForm extends Component
 
     public function sendToApproval(): RedirectResponse|Redirector
     {
-        return $this->persist('enviada');
+        // usa el estado real de tu enum/BD
+        return $this->persist('en_aprobacion');
     }
 
     private function persist(string $estado): RedirectResponse|Redirector
@@ -188,7 +191,7 @@ class RequisicionForm extends Component
 
         DB::transaction(function () use ($estado) {
             if ($this->isEditing) {
-                $req = Requisicion::with('items')->findOrFail($this->requisicionId);
+                $req = Requisicion::with(['items','aprobaciones'])->findOrFail($this->requisicionId);
 
                 // Seguridad
                 abort_unless($req->solicitante_id === Auth::id() && $req->estado === 'borrador', 403);
@@ -218,6 +221,12 @@ class RequisicionForm extends Component
                         'link_compra'     => $row['link_compra'] ?: null,
                     ]);
                 }
+
+                // Si pasa de borrador a aprobación, reinicia cadena y vuelve a crearla
+                if ($estado === 'en_aprobacion') {
+                    $req->aprobaciones()->where('estado','pendiente')->delete();
+                    $this->crearCadenaAprobacion($req);
+                }
             } else {
                 // Crear nueva
                 $fecha = Carbon::parse($this->fecha_emision);
@@ -246,6 +255,10 @@ class RequisicionForm extends Component
                         'link_compra'     => $row['link_compra'] ?: null,
                     ]);
                 }
+
+                if ($estado === 'en_aprobacion') {
+                    $this->crearCadenaAprobacion($req);
+                }
             }
         });
 
@@ -253,7 +266,81 @@ class RequisicionForm extends Component
             ? 'Requisición guardada en borrador.'
             : 'Requisición enviada. Pasará al flujo de aprobación.');
 
-        // Importante: devolver el redirect (nada de ->send())
         return redirect()->route('requisiciones.index');
     }
+
+    // ---------- Cadena de aprobación ----------
+    private function crearCadenaAprobacion(Requisicion $req): void
+{
+    // -------- 1) Jefe directo --------
+    $nivelJefeId = NivelAprobacion::where('rol_aprobador', 'jefe')->value('id');
+    $jefeId      = $this->resolverJefeDirecto($req->solicitante_id); // users.supervisor_id
+
+    if ($jefeId && $nivelJefeId) {
+        Aprobacion::create([
+            'requisicion_id'      => $req->id,
+            'nivel_aprobacion_id' => $nivelJefeId,
+            'aprobador_id'        => $jefeId,
+            'estado'              => 'pendiente',
+        ]);
+    } elseif (!$nivelJefeId) {
+        // Lanza error claro si falta la config base
+        throw ValidationException::withMessages([
+            'aprobaciones' => "No existe el nivel 'jefe_directo' en la tabla niveles_aprobacion.",
+        ]);
+    }
+
+    // 1) Nivel por monto
+    $nivel = NivelAprobacion::where('rol_aprobador','!=','jefe')
+        ->where('monto_min','<=',$req->total)
+        ->where(function($q) use ($req){
+            $q->whereNull('monto_max')->orWhere('monto_max','>=',$req->total);
+        })
+        ->orderBy('orden')
+        ->first();
+
+    if ($nivel) {
+        // Para niveles por rol (compras / operaciones) puedes dejar aprobador_id null
+        // y aprobarán por pertenecer al rol. Para "gerencia_alta" igual.
+        Aprobacion::create([
+            'requisicion_id'      => $req->id,
+            'nivel_aprobacion_id' => $nivel->id,
+            'aprobador_id'        => null,     // firma por rol
+            'estado'              => 'pendiente',
+        ]);
+    }
+}
+
+    private function resolverJefeDirecto(int $empleadoId): ?int
+    {
+        // Ajusta a tu esquema real (por ejemplo, columna supervisor_id en users)
+        return User::where('id',$empleadoId)->value('supervisor_id');
+    }
+
+    private function findUserIdByRole(string $role): ?int
+    {
+        // Spatie
+        return User::role($role)->value('id');
+    }
+
+    /** Devuelve el nivel cuyo rango contiene el monto (excluye jefe_directo) */
+    private function nivelPorMonto(float $total): ?NivelAprobacion
+    {
+        return NivelAprobacion::where('rol_aprobador','!=','jefe_directo')
+            ->where('monto_min','<=',$total)
+            ->where(fn($q)=>$q->where('monto_max','>=',$total)->orWhereNull('monto_max'))
+            ->orderBy('orden')
+            ->first();
+    }
+        /** Devuelve los roles reales admitidos por un nivel */
+    private function rolesQuePuedenFirmar(string $rolAprobador): array
+    {
+        // Mapa de rol "lógico" → 1 o más roles reales de Spatie
+        $map = [
+            'gerencia_alta' => ['gerencia_adm','gerencia_finanzas'],
+        ];
+
+        return $map[$rolAprobador] ?? [$rolAprobador];
+    }
+
 }

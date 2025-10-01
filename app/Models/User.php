@@ -66,4 +66,8 @@ class User extends Authenticatable
     {
         return $this->hasMany(User::class, 'supervisor_id');
     }
+    public function isApprover(): bool
+    {
+        return $this->hasAnyRole(['compras','gerente_area','gerencia_adm','direccion','administrador']);
+    }
 }
