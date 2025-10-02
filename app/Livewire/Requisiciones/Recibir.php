@@ -2,35 +2,40 @@
 
 namespace App\Livewire\Requisiciones;
 
-use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Livewire\Component;
 use App\Models\Requisicion;
-use App\Models\Departamento;
-use Illuminate\Support\Facades\Auth;
-use Livewire\Attributes\Layout;   
+use App\Models\User;
+use App\Notifications\RequisicionRecibidaParaCompras;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Layout;
+use Livewire\Component;
 
-#[Layout('layouts.app')] // 👈 usa tu layout real (no 'components.layouts.app')
+#[Layout('layouts.app')]
 class Recibir extends Component
 {
     use AuthorizesRequests;
+
     public Requisicion $requisicion;
 
     public string $fecha_recibido;
     public string $area_recibe = '';
-    public array $departamentos = [];
+    public array  $departamentos = [];
 
-     public function mount(Requisicion $requisicion): void
+    public function mount(Requisicion $requisicion): void
     {
-        // Seguridad por policy (ya valida "aprobada_final" + quién puede)
         $this->authorize('receive', $requisicion);
+        
+        // Carga relaciones para mostrar resumen + partidas
+        $requisicion->load([
+            'solicitante',
+            'departamentoRef',
+            'centroCostoRef',
+            'items',
+        ]);
 
-        $this->requisicion   = $requisicion;
-
-        // Prefills
+        $this->requisicion    = $requisicion;
         $this->fecha_recibido = now()->toDateString();
         $this->area_recibe    = $requisicion->departamentoRef?->nombre ?? '';
 
-        // Para el select de áreas (si lo usas)
         $this->departamentos = \App\Models\Departamento::orderBy('nombre')
             ->get(['id','nombre'])
             ->map(fn($d) => ['id' => $d->id, 'nombre' => $d->nombre])
@@ -40,8 +45,8 @@ class Recibir extends Component
     protected function rules(): array
     {
         return [
-            'fecha_recibido' => ['required','date'],
-            'area_recibe'    => ['required','string','max:255'],
+            'fecha_recibido' => ['required', 'date'],
+            'area_recibe'    => ['required', 'string', 'max:255'],
         ];
     }
 
@@ -49,15 +54,19 @@ class Recibir extends Component
     {
         $this->validate();
 
-        // Guardado: recibido_por_id = solicitante (según tu requerimiento)
+        // Guardado
         $this->requisicion->update([
-            'recibido_por_id' => $this->requisicion->solicitante_id,
+            'recibido_por_id' => $this->requisicion->solicitante_id, // el solicitante
             'fecha_recibido'  => $this->fecha_recibido,
             'area_recibe'     => $this->area_recibe,
             'estado'          => 'recibida',
         ]);
 
-        session()->flash('status', 'Requisición marcada como recibida.');
+        // === Notificar al rol "compras" ===
+        User::role('compras')->get()
+            ->each(fn (User $u) => $u->notify(new RequisicionRecibidaParaCompras($this->requisicion)));
+
+        session()->flash('status', 'Recepción registrada y notificada a Compras.');
         return redirect()->route('requisiciones.index');
     }
 

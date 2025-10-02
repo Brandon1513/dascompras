@@ -4,9 +4,13 @@ namespace App\Livewire\Requisiciones;
 
 use App\Models\Aprobacion;
 use App\Models\Requisicion;
+use App\Models\User;
+use App\Notifications\RequisicionAprobadaFinal;
+use App\Notifications\RequisicionRechazada;
+use App\Services\FlujoAprobacionService;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class Aprobar extends Component
@@ -19,11 +23,12 @@ class Aprobar extends Component
 
     public function mount(Requisicion $requisicion): void
     {
+        // Política (only users allowed to approve can view this page/component)
         $this->authorize('approve', $requisicion);
 
         $this->requisicion = $requisicion;
 
-        // Traemos TODO lo que mostraremos
+        // Cargamos todo lo que mostramos
         $this->requisicion->load([
             'solicitante',
             'departamentoRef',
@@ -33,14 +38,19 @@ class Aprobar extends Component
             'aprobaciones.aprobador',
         ]);
 
-        $this->apPendiente = $this->miAprobacionPendiente(); // para banner y botones
+        $this->apPendiente = $this->miAprobacionPendiente();
     }
 
     /** Mapa de roles "lógicos" a 1+ roles reales (Spatie) */
-    private function rolesQuePuedenFirmar(string $rolAprobador): array {
-    $map = ['gerencia_alta' => ['gerencia_adm','gerencia_finanzas']];
-    return $map[$rolAprobador] ?? [$rolAprobador];
-}
+    private function rolesQuePuedenFirmar(string $rolAprobador): array
+    {
+        // ejemplo: una sola etapa puede ser firmada por varios roles reales
+        $map = [
+            'gerencia_alta' => ['gerencia_adm', 'gerencia_finanzas'],
+        ];
+
+        return $map[$rolAprobador] ?? [$rolAprobador];
+    }
 
     /** Primera aprobación PENDIENTE que le corresponde al usuario actual */
     private function miAprobacionPendiente(): ?Aprobacion
@@ -52,8 +62,7 @@ class Aprobar extends Component
             ->where('estado', 'pendiente')
             ->orderBy('created_at');
 
-        // Filtramos candidatos: o bien asignada a la persona,
-        // o bien por rol (lo validamos en PHP por mapeo)
+        // Candidatos (asignada a la persona o por rol)
         $q->where(function ($qq) use ($user) {
             $qq->where('aprobador_id', $user->id)
                ->orWhereHas('nivel', function ($qn) {
@@ -61,7 +70,7 @@ class Aprobar extends Component
                });
         });
 
-        // Mapeo final por PHP
+        // Validación final en PHP (por mapeo de roles)
         $ap = $q->with('nivel')->get()->first(function ($ap) use ($user) {
             if ($ap->aprobador_id === $user->id) return true;
             if (!$ap->nivel) return false;
@@ -75,7 +84,9 @@ class Aprobar extends Component
 
     public function approve()
     {
-        DB::transaction(function () {
+        $siguiente = null;
+
+        DB::transaction(function () use (&$siguiente) {
             $ap = $this->miAprobacionPendiente();
             abort_unless($ap, 403);
 
@@ -87,15 +98,31 @@ class Aprobar extends Component
                 'aprobador_id' => $ap->aprobador_id ?: Auth::id(),
             ]);
 
+            // ¿Queda alguien pendiente?
             $siguiente = Aprobacion::where('requisicion_id', $this->requisicion->id)
                 ->where('estado', 'pendiente')
                 ->orderBy('created_at')
                 ->first();
 
+            // Si nadie más está pendiente, cerrar la requisición
             if (!$siguiente) {
                 $this->requisicion->update(['estado' => 'aprobada_final']);
             }
         });
+
+        // --- NOTIFICACIONES ---
+        if ($siguiente) {
+            // Notifica al siguiente aprobador (por persona o por rol)
+            app(FlujoAprobacionService::class)->notificarSiguiente($this->requisicion);
+        } else {
+            // Notifica aprobación final al solicitante (y si quieres, a Compras)
+            optional($this->requisicion->solicitante)
+                ->notify(new RequisicionAprobadaFinal($this->requisicion));
+
+            // Ejemplo: avisar a todos con rol "compras"
+            User::role('compras')->get()
+                ->each(fn (User $u) => $u->notify(new RequisicionAprobadaFinal($this->requisicion)));
+        }
 
         session()->flash('status', 'Aprobada correctamente.');
         return redirect()->route('requisiciones.index');
@@ -118,6 +145,10 @@ class Aprobar extends Component
             $this->requisicion->update(['estado' => 'rechazada']);
         });
 
+        // Notifica al solicitante el rechazo
+        optional($this->requisicion->solicitante)
+            ->notify(new RequisicionRechazada($this->requisicion, $this->comentarios));
+
         session()->flash('status', 'Rechazada.');
         return redirect()->route('requisiciones.index');
     }
@@ -125,7 +156,7 @@ class Aprobar extends Component
     public function render()
     {
         return view('livewire.requisiciones.aprobar', [
-            'apPendiente' => $this->apPendiente, // úsalo en el blade
+            'apPendiente' => $this->apPendiente,
         ]);
     }
 }

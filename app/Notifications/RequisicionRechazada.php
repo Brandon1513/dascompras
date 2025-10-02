@@ -2,53 +2,32 @@
 
 namespace App\Notifications;
 
+use App\Models\Requisicion;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class RequisicionRechazada extends Notification
+class RequisicionRechazada extends Notification implements ShouldQueue
 {
     use Queueable;
 
-    /**
-     * Create a new notification instance.
-     */
-    public function __construct()
-    {
-        //
-    }
+    public function __construct(public Requisicion $requisicion, public ?string $motivo = null) {}
 
-    /**
-     * Get the notification's delivery channels.
-     *
-     * @return array<int, string>
-     */
-    public function via(object $notifiable): array
-    {
-        return ['mail'];
-    }
+    public function via($n): array { return ['mail','database']; }
 
-    /**
-     * Get the mail representation of the notification.
-     */
-    public function toMail(object $notifiable): MailMessage
+    public function toMail($n): MailMessage
     {
         return (new MailMessage)
-            ->line('The introduction to the notification.')
-            ->action('Notification Action', url('/'))
-            ->line('Thank you for using our application!');
+            ->subject("Requisición {$this->requisicion->folio} rechazada")
+            ->greeting("Hola, {$n->name}")
+            ->line("Tu requisición fue rechazada.")
+            ->line($this->motivo ? "Motivo: {$this->motivo}" : '')
+            ->action('Ver requisición', route('requisiciones.show', $this->requisicion));
     }
 
-    /**
-     * Get the array representation of the notification.
-     *
-     * @return array<string, mixed>
-     */
-    public function toArray(object $notifiable): array
+    public function toArray($n): array
     {
-        return [
-            //
-        ];
+        return ['requisicion_id'=>$this->requisicion->id,'folio'=>$this->requisicion->folio];
     }
 }

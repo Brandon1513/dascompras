@@ -13,6 +13,7 @@ use App\Models\RequisicionItem;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\RedirectResponse;
+use App\Services\FlujoAprobacionService;
 use Illuminate\Validation\ValidationException;
 use Livewire\Features\SupportRedirects\Redirector;
 
@@ -173,30 +174,41 @@ class RequisicionForm extends Component
     }
 
     // --- Guardados / Redirects ---
-    public function saveDraft(): RedirectResponse|Redirector
+    public function saveDraft()
     {
-        return $this->persist('borrador');
+        $this->persist('borrador');
+        session()->flash('status', 'Requisición guardada en borrador.');
+        return redirect()->route('requisiciones.index');
     }
 
-    public function sendToApproval(): RedirectResponse|Redirector
+    public function sendToApproval()
     {
-        // usa el estado real de tu enum/BD
-        return $this->persist('en_aprobacion');
+        // guarda y pasa a 'en_aprobacion'
+        $req = $this->persist('en_aprobacion');
+
+        //Crear cadena de aprobacion
+        $this->crearCadenaAprobacion($req);
+
+        // notifica al siguiente aprobador
+        app(FlujoAprobacionService::class)->notificarSiguiente($req);
+
+        session()->flash('status', 'Requisición enviada. Pasará al flujo de aprobación.');
+        return redirect()->route('requisiciones.index');
     }
 
-    private function persist(string $estado): RedirectResponse|Redirector
+    private function persist(string $estado): Requisicion
     {
         $this->validate($this->rules());
         $this->recalcularTotales();
 
-        DB::transaction(function () use ($estado) {
-            if ($this->isEditing) {
-                $req = Requisicion::with(['items','aprobaciones'])->findOrFail($this->requisicionId);
+        return DB::transaction(function () use ($estado) {
 
-                // Seguridad
+            if ($this->isEditing && $this->requisicionId) {
+                $req = Requisicion::with('items')->findOrFail($this->requisicionId);
+
+                // seguridad
                 abort_unless($req->solicitante_id === Auth::id() && $req->estado === 'borrador', 403);
 
-                // Actualizar cabecera (folio se conserva)
                 $req->update([
                     'fecha_emision'   => $this->fecha_emision,
                     'departamento_id' => $this->departamento_id,
@@ -209,7 +221,6 @@ class RequisicionForm extends Component
                     'estado'          => $estado,
                 ]);
 
-                // Reemplazar items
                 $req->items()->delete();
                 foreach ($this->items as $row) {
                     $req->items()->create([
@@ -222,14 +233,12 @@ class RequisicionForm extends Component
                     ]);
                 }
 
-                // Si pasa de borrador a aprobación, reinicia cadena y vuelve a crearla
-                if ($estado === 'en_aprobacion') {
-                    $req->aprobaciones()->where('estado','pendiente')->delete();
-                    $this->crearCadenaAprobacion($req);
-                }
+                $this->requisicionId = $req->id; // <-- asegúrate de guardar el id
+                return $req;
+
             } else {
-                // Crear nueva
-                $fecha = Carbon::parse($this->fecha_emision);
+                // crear nueva
+                $fecha = \Illuminate\Support\Carbon::parse($this->fecha_emision);
 
                 $req = Requisicion::create([
                     'folio'           => $this->generateFolio($fecha),
@@ -256,22 +265,18 @@ class RequisicionForm extends Component
                     ]);
                 }
 
-                if ($estado === 'en_aprobacion') {
-                    $this->crearCadenaAprobacion($req);
-                }
+                $this->requisicionId = $req->id; // <-- guarda el id recién creado
+                return $req;
             }
         });
-
-        session()->flash('status', $estado === 'borrador'
-            ? 'Requisición guardada en borrador.'
-            : 'Requisición enviada. Pasará al flujo de aprobación.');
-
-        return redirect()->route('requisiciones.index');
     }
 
     // ---------- Cadena de aprobación ----------
     private function crearCadenaAprobacion(Requisicion $req): void
 {
+    // Limpia por si se reenvía
+    $req->aprobaciones()->delete();
+
     // -------- 1) Jefe directo --------
     $nivelJefeId = NivelAprobacion::where('rol_aprobador', 'jefe')->value('id');
     $jefeId      = $this->resolverJefeDirecto($req->solicitante_id); // users.supervisor_id
@@ -286,7 +291,7 @@ class RequisicionForm extends Component
     } elseif (!$nivelJefeId) {
         // Lanza error claro si falta la config base
         throw ValidationException::withMessages([
-            'aprobaciones' => "No existe el nivel 'jefe_directo' en la tabla niveles_aprobacion.",
+            'aprobaciones' => "No existe el nivel 'jefe' en la tabla niveles_aprobacion.",
         ]);
     }
 
@@ -326,7 +331,7 @@ class RequisicionForm extends Component
     /** Devuelve el nivel cuyo rango contiene el monto (excluye jefe_directo) */
     private function nivelPorMonto(float $total): ?NivelAprobacion
     {
-        return NivelAprobacion::where('rol_aprobador','!=','jefe_directo')
+        return NivelAprobacion::where('rol_aprobador','!=','jefe')
             ->where('monto_min','<=',$total)
             ->where(fn($q)=>$q->where('monto_max','>=',$total)->orWhereNull('monto_max'))
             ->orderBy('orden')
