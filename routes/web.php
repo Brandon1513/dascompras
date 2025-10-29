@@ -42,13 +42,20 @@ Route::middleware(['auth','active','role:administrador|compras'])->group(functio
 
     Route::get('/expedientes/{expediente}/adjuntar',  [ExpedienteWebController::class, 'edit'])
     ->whereNumber('expediente')->name('expedientes.edit');
-Route::post('/expedientes/{expediente}/adjuntar', [ExpedienteWebController::class, 'attach'])
+    Route::post('/expedientes/{expediente}/adjuntar', [ExpedienteWebController::class, 'attach'])
     ->whereNumber('expediente')->name('expedientes.attach');
 
     // 2) Dinámica al final y con restricción numérica
     Route::get('/expedientes/{expediente}',   [ExpedienteWebController::class, 'show'])
         ->whereNumber('expediente') // <-- evita que “carga” coincida
         ->name('expedientes.show');
+        Route::post('expedientes/{expediente}/completar-manual',
+        [\App\Http\Controllers\ExpedienteWebController::class, 'completeManual']
+    )->name('expedientes.complete-manual');
+
+    Route::delete('expedientes/{expediente}/completar-manual',
+        [\App\Http\Controllers\ExpedienteWebController::class, 'undoCompleteManual']
+    )->name('expedientes.undo-complete-manual');
 });
 
 //requis
@@ -62,6 +69,9 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/requisiciones/{requisicion}/recibir', Recibir::class)
         ->name('requisiciones.recibir');
 });
+
+
+
 
 
 require __DIR__.'/auth.php';

@@ -17,32 +17,55 @@
           </div>
         @endif
 
-        <form method="POST" action="{{ route('expedientes.attach',$expediente) }}" enctype="multipart/form-data" class="space-y-6">
+        <form method="POST"
+              action="{{ route('expedientes.attach',$expediente) }}"
+              enctype="multipart/form-data"
+              class="space-y-6">
           @csrf
+
           <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+            {{-- REQUISICIÓN (múltiples) --}}
             <div>
-              <label class="block mb-1 text-sm font-medium text-gray-700">Requisición</label>
-              <input type="file" name="requi" accept=".jpg,.jpeg,.png,.pdf" class="w-full border-gray-300 rounded-md" />
+              <label class="block mb-1 text-sm font-medium text-gray-700">Requisición (múltiples)</label>
+              <input type="file"
+                     name="requi[]"
+                     multiple
+                     accept=".jpg,.jpeg,.png,.pdf"
+                     class="w-full border-gray-300 rounded-md" />
               <p class="mt-1 text-xs text-gray-500">Actual: {{ $expediente->has_requi ? 'Sí' : 'No' }}</p>
             </div>
+
+            {{-- FACTURA (múltiples) --}}
             <div>
-              <label class="block mb-1 text-sm font-medium text-gray-700">Factura</label>
-              <input type="file" name="factura" accept=".jpg,.jpeg,.png,.pdf" class="w-full border-gray-300 rounded-md" />
+              <label class="block mb-1 text-sm font-medium text-gray-700">Factura (múltiples)</label>
+              <input type="file"
+                     name="factura[]"
+                     multiple
+                     accept=".jpg,.jpeg,.png,.pdf"
+                     class="w-full border-gray-300 rounded-md" />
               <p class="mt-1 text-xs text-gray-500">Actual: {{ $expediente->has_factura ? 'Sí' : 'No' }}</p>
             </div>
+
+            {{-- RECIBOS (múltiples) --}}
             <div>
-              <label class="block mb-1 text-sm font-medium text-gray-700">Otros (múltiples)</label>
-              <input type="file" name="otros[]" multiple accept=".jpg,.jpeg,.png,.pdf" class="w-full border-gray-300 rounded-md" />
+              <label class="block mb-1 text-sm font-medium text-gray-700">Recibos (múltiples)</label>
+              <input type="file"
+                     name="otros[]"
+                     multiple
+                     accept=".jpg,.jpeg,.png,.pdf"
+                     class="w-full border-gray-300 rounded-md" />
               <p class="mt-1 text-xs text-gray-500">Actual: {{ $expediente->otros_count }}</p>
             </div>
           </div>
 
           <div class="flex justify-end">
-                <a href="{{ route('expedientes.show',$expediente) }}" class="px-4 py-2 mr-2 text-sm border rounded-md">Cancelar</a>
-                <button class="px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-md hover:bg-indigo-700">
-                {{ $expediente->estado === 'completo' ? 'Guardar cambios' : 'Adjuntar' }}
-                </button>
-            </div>
+            <a href="{{ route('expedientes.show',$expediente) }}" class="px-4 py-2 mr-2 text-sm border rounded-md">
+              Cancelar
+            </a>
+            <button class="px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-md hover:bg-indigo-700">
+              {{ $expediente->estado === 'completo' ? 'Guardar cambios' : 'Adjuntar' }}
+            </button>
+          </div>
         </form>
       </div>
     </div>

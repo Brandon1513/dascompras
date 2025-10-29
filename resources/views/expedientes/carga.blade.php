@@ -4,11 +4,11 @@
   </x-slot>
 
   <div class="py-12">
-    <div class="mx-auto max-w-3xl sm:px-6 lg:px-8">
+    <div class="max-w-3xl mx-auto sm:px-6 lg:px-8">
       <div class="p-6 bg-white shadow sm:rounded-lg">
         {{-- Mensajes --}}
         @if(session('success'))
-          <div class="mb-4 p-3 rounded bg-green-50 text-green-800">
+          <div class="p-3 mb-4 text-green-800 rounded bg-green-50">
             {{ session('success') }}
             @if(session('folder_name'))
               <div class="text-sm text-gray-700">Carpeta: <span class="font-medium">{{ session('folder_name') }}</span></div>
@@ -24,8 +24,8 @@
         @endif
 
         @if ($errors->any())
-          <div class="mb-4 p-3 rounded bg-red-50 text-red-700">
-            <ul class="list-disc list-inside text-sm">
+          <div class="p-3 mb-4 text-red-700 rounded bg-red-50">
+            <ul class="text-sm list-disc list-inside">
               @foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach
             </ul>
           </div>
@@ -34,8 +34,8 @@
         {{-- Resumen de subidos --}}
         @if(session('subidos'))
           <div class="mb-6">
-            <h3 class="font-semibold mb-2">Archivos subidos:</h3>
-            <ul class="list-disc list-inside text-sm text-gray-700">
+            <h3 class="mb-2 font-semibold">Archivos subidos:</h3>
+            <ul class="text-sm text-gray-700 list-disc list-inside">
               @foreach(session('subidos') as $s)
                 <li>
                   <span class="font-medium">{{ $s['tipo'] }}:</span> {{ $s['nombre'] }}
@@ -51,26 +51,26 @@
           @csrf
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Nombre de la carpeta</label>
+            <label class="block mb-1 text-sm font-medium text-gray-700">Nombre de la carpeta</label>
             <input name="carpeta" value="{{ old('carpeta') }}" required
                    class="w-full border-gray-300 rounded-md focus:border-indigo-500 focus:ring-indigo-500"/>
-            <p class="text-xs text-gray-500 mt-1">Ej: EXP-2025-0003 - Proveedor XYZ</p>
+            <p class="mt-1 text-xs text-gray-500">Ej: EXP-2025-0003 - Proveedor XYZ</p>
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Requisición (foto/pdf)</label>
-            <input type="file" name="requi" accept=".jpg,.jpeg,.png,.pdf"
-                   class="w-full border-gray-300 rounded-md"/>
+            <label class="block mb-1 text-sm font-medium text-gray-700">Requisición ( multiples foto/pdf)</label>
+            <input type="file" name="requi[]" multiple accept=".jpg,.jpeg,.png,.pdf"
+                  class="w-full border-gray-300 rounded-md"/>
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Factura (foto/pdf)</label>
-            <input type="file" name="factura" accept=".jpg,.jpeg,.png,.pdf"
-                   class="w-full border-gray-300 rounded-md"/>
+            <label class="block mb-1 text-sm font-medium text-gray-700">Factura ( multiples foto/pdf)</label>
+            <input type="file" name="factura[]" multiple accept=".jpg,.jpeg,.png,.pdf"
+                  class="w-full border-gray-300 rounded-md"/>
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Otros (múltiples opcional)</label>
+            <label class="block mb-1 text-sm font-medium text-gray-700">Recibos (múltiples opcional)</label>
             <input type="file" name="otros[]" multiple accept=".jpg,.jpeg,.png,.pdf"
                    class="w-full border-gray-300 rounded-md"/>
           </div>

@@ -13,39 +13,37 @@ use App\Http\Requests\CargaExpedienteRequest;
 
 class CargaExpedienteApiController extends Controller
 {
+    /* ======================= CREATE (desde la app) ======================= */
     public function store(CargaExpedienteRequest $request, GraphSharePointService $graph)
     {
         $data    = $request->validated();
-        $userId  = optional($request->user())->id; // debe venir por Sanctum
+        $userId  = optional($request->user())->id; // Sanctum
         $driveId = env('GRAPH_DRIVE_ID');
         $root    = trim(env('GRAPH_FOLDER_ROOT','/Expedientes'), '/');
 
-        // Nombre de carpeta saneado para SharePoint
         $folderName = $this->sanitizeFolderName($data['carpeta']);
 
         try {
-            // 1) Asegura carpeta raíz (idempotente)
             try { $graph->createFolder($driveId, '/', $root); } catch (\Throwable $e) {}
 
-            // 2) Crea carpeta del expediente + link
+            // Carpeta expediente + link
             $folder     = $graph->createFolder($driveId, "/{$root}", $folderName);
             $folderLink = $graph->createFolderLink($driveId, $folder['id']);
 
-            // 3) Rutas y subcarpetas
-            $basePath    = "/{$root}/{$folder['name']}";
-            $requiPath   = "{$basePath}/01_REQUI";
-            $facturaPath = "{$basePath}/02_FACTURA";
-            $otrosPath   = "{$basePath}/03_OTROS";
+            // Subcarpetas
+            $basePath     = "/{$root}/{$folder['name']}";
+            $requiPath    = "{$basePath}/01_REQUI";
+            $facturaPath  = "{$basePath}/02_FACTURA";
+            $recibosPath  = "{$basePath}/03_RECIBOS";
 
             $graph->createFolder($driveId, $basePath, "01_REQUI");
             $graph->createFolder($driveId, $basePath, "02_FACTURA");
-            $graph->createFolder($driveId, $basePath, "03_OTROS");
+            $graph->createFolder($driveId, $basePath, "03_RECIBOS");
 
-            // 4) Persistir expediente en BD
             DB::beginTransaction();
 
             $exp = Expediente::create([
-                'nombre_carpeta' => $folder['name'],   // por si Graph renombró por conflicto
+                'nombre_carpeta' => $folder['name'],
                 'folder_item_id' => $folder['id'] ?? null,
                 'folder_link'    => $folderLink,
                 'drive_id'       => $driveId,
@@ -53,14 +51,14 @@ class CargaExpedienteApiController extends Controller
                 'created_by'     => $userId,
             ]);
 
-            // 5) Subir archivos y registrar en BD
             $hasRequi = false; $hasFactura = false; $otrosCount = 0;
             $items = [];
 
-            if ($request->hasFile('requi')) {
-                $f = $request->file('requi');
-                $name = time().'_REQUI_'.$f->getClientOriginalName();
-                $it = $graph->upload($driveId, $requiPath, $name, $f->getRealPath());
+            // REQUIS
+            foreach ((array) $request->file('requi', []) as $idx => $f) {
+                if (!$f) continue;
+                $name = time()."_REQUI{$idx}_".$f->getClientOriginalName();
+                $it   = $graph->upload($driveId, $requiPath, $name, $f->getRealPath());
 
                 ExpedienteArchivo::create([
                     'expediente_id'   => $exp->id,
@@ -77,10 +75,11 @@ class CargaExpedienteApiController extends Controller
                 $items[] = ['tipo'=>'requi','nombre'=>$f->getClientOriginalName(),'url'=>$it['webUrl'] ?? null];
             }
 
-            if ($request->hasFile('factura')) {
-                $f = $request->file('factura');
-                $name = time().'_FACTURA_'.$f->getClientOriginalName();
-                $it = $graph->upload($driveId, $facturaPath, $name, $f->getRealPath());
+            // FACTURAS
+            foreach ((array) $request->file('factura', []) as $idx => $f) {
+                if (!$f) continue;
+                $name = time()."_FACTURA{$idx}_".$f->getClientOriginalName();
+                $it   = $graph->upload($driveId, $facturaPath, $name, $f->getRealPath());
 
                 ExpedienteArchivo::create([
                     'expediente_id'   => $exp->id,
@@ -97,13 +96,15 @@ class CargaExpedienteApiController extends Controller
                 $items[] = ['tipo'=>'factura','nombre'=>$f->getClientOriginalName(),'url'=>$it['webUrl'] ?? null];
             }
 
-            foreach ($request->file('otros', []) as $i => $f) {
-                $name = time()."_OTRO{$i}_".$f->getClientOriginalName();
-                $it = $graph->upload($driveId, $otrosPath, $name, $f->getRealPath());
+            // RECIBOS (se guardan como tipo 'otros' para compatibilidad)
+            foreach ((array) $request->file('recibos', []) as $idx => $f) {
+                if (!$f) continue;
+                $name = time()."_RECIBO{$idx}_".$f->getClientOriginalName();
+                $it   = $graph->upload($driveId, $recibosPath, $name, $f->getRealPath());
 
                 ExpedienteArchivo::create([
                     'expediente_id'   => $exp->id,
-                    'tipo'            => 'otros',
+                    'tipo'            => 'otros', // <- mantener 'otros' en BD
                     'nombre_original' => $f->getClientOriginalName(),
                     'extension'       => $f->getClientOriginalExtension(),
                     'tamano'          => $f->getSize(),
@@ -116,7 +117,7 @@ class CargaExpedienteApiController extends Controller
                 $items[] = ['tipo'=>'otros','nombre'=>$f->getClientOriginalName(),'url'=>$it['webUrl'] ?? null];
             }
 
-            // 6) Actualiza flags/estado
+            // Estado
             $exp->update([
                 'has_requi'   => $hasRequi,
                 'has_factura' => $hasFactura,
@@ -126,7 +127,6 @@ class CargaExpedienteApiController extends Controller
 
             DB::commit();
 
-            // 7) Response
             $progreso = ((int)$hasRequi + (int)$hasFactura + ($otrosCount>0 ? 1 : 0)).'/3';
 
             return response()->json([
@@ -152,11 +152,8 @@ class CargaExpedienteApiController extends Controller
         }
     }
 
-    private function sanitizeFolderName(string $name): string
-    {
-        $name = preg_replace('/["*:<>?\/\\\\|#%]/', '-', $name);
-        return trim($name, ". ") ?: 'Carpeta';
-    }
+
+    /* ======================= APPEND (agregar a existente) ======================= */
     public function append(AdjuntarArchivoRequest $request, GraphSharePointService $graph, Expediente $expediente)
     {
         $userId  = optional($request->user())->id;
@@ -164,55 +161,69 @@ class CargaExpedienteApiController extends Controller
 
         $basePath    = $expediente->folder_path
             ?: '/'.trim(env('GRAPH_FOLDER_ROOT','/Expedientes'), '/').'/'.$expediente->nombre_carpeta;
-        $requiPath   = "{$basePath}/01_REQUI";
-        $facturaPath = "{$basePath}/02_FACTURA";
-        $otrosPath   = "{$basePath}/03_OTROS";
+
+        $requiPath    = "{$basePath}/01_REQUI";
+        $facturaPath  = "{$basePath}/02_FACTURA";
+        $recibosPath  = "{$basePath}/03_RECIBOS"; // ← renombrada
 
         $hasRequi   = $expediente->has_requi;
         $hasFactura = $expediente->has_factura;
         $otrosCount = (int)$expediente->otros_count;
         $items = [];
 
-        if ($request->hasFile('requi')) {
-            $f = $request->file('requi');
+        foreach ($this->filesFrom($request, 'requi') as $f) {
             $name = time().'_REQUI_'.$f->getClientOriginalName();
-            $it = $graph->upload($driveId, $requiPath, $name, $f->getRealPath());
+            $it   = $graph->upload($driveId, $requiPath, $name, $f->getRealPath());
+
             ExpedienteArchivo::create([
-                'expediente_id'=>$expediente->id,'tipo'=>'requi',
-                'nombre_original'=>$f->getClientOriginalName(),
-                'extension'=>$f->getClientOriginalExtension(),
-                'tamano'=>$f->getSize(),'item_id'=>$it['id'] ?? null,
-                'web_url'=>$it['webUrl'] ?? null,'subido_por'=>$userId,
+                'expediente_id'   => $expediente->id,
+                'tipo'            => 'requi',
+                'nombre_original' => $f->getClientOriginalName(),
+                'extension'       => $f->getClientOriginalExtension(),
+                'tamano'          => $f->getSize(),
+                'item_id'         => $it['id'] ?? null,
+                'web_url'         => $it['webUrl'] ?? null,
+                'subido_por'      => $userId,
             ]);
+
             $hasRequi = true;
-            $items[] = ['tipo'=>'requi','nombre'=>$f->getClientOriginalName(),'url'=>$it['webUrl'] ?? null];
+            $items[]  = ['tipo'=>'requi','nombre'=>$f->getClientOriginalName(),'url'=>$it['webUrl'] ?? null];
         }
 
-        if ($request->hasFile('factura')) {
-            $f = $request->file('factura');
+        foreach ($this->filesFrom($request, 'factura') as $f) {
             $name = time().'_FACTURA_'.$f->getClientOriginalName();
-            $it = $graph->upload($driveId, $facturaPath, $name, $f->getRealPath());
+            $it   = $graph->upload($driveId, $facturaPath, $name, $f->getRealPath());
+
             ExpedienteArchivo::create([
-                'expediente_id'=>$expediente->id,'tipo'=>'factura',
-                'nombre_original'=>$f->getClientOriginalName(),
-                'extension'=>$f->getClientOriginalExtension(),
-                'tamano'=>$f->getSize(),'item_id'=>$it['id'] ?? null,
-                'web_url'=>$it['webUrl'] ?? null,'subido_por'=>$userId,
+                'expediente_id'   => $expediente->id,
+                'tipo'            => 'factura',
+                'nombre_original' => $f->getClientOriginalName(),
+                'extension'       => $f->getClientOriginalExtension(),
+                'tamano'          => $f->getSize(),
+                'item_id'         => $it['id'] ?? null,
+                'web_url'         => $it['webUrl'] ?? null,
+                'subido_por'      => $userId,
             ]);
+
             $hasFactura = true;
-            $items[] = ['tipo'=>'factura','nombre'=>$f->getClientOriginalName(),'url'=>$it['webUrl'] ?? null];
+            $items[]    = ['tipo'=>'factura','nombre'=>$f->getClientOriginalName(),'url'=>$it['webUrl'] ?? null];
         }
 
-        foreach ($request->file('otros', []) as $i => $f) {
-            $name = time()."_OTRO{$i}_".$f->getClientOriginalName();
-            $it = $graph->upload($driveId, $otrosPath, $name, $f->getRealPath());
+        foreach ($this->filesFrom($request, 'recibos') as $i => $f) {
+            $name = time()."_RECIBO{$i}_".$f->getClientOriginalName();
+            $it   = $graph->upload($driveId, $recibosPath, $name, $f->getRealPath());
+
             ExpedienteArchivo::create([
-                'expediente_id'=>$expediente->id,'tipo'=>'otros',
-                'nombre_original'=>$f->getClientOriginalName(),
-                'extension'=>$f->getClientOriginalExtension(),
-                'tamano'=>$f->getSize(),'item_id'=>$it['id'] ?? null,
-                'web_url'=>$it['webUrl'] ?? null,'subido_por'=>$userId,
+                'expediente_id'   => $expediente->id,
+                'tipo'            => 'otros', // mantenemos 'otros' en BD
+                'nombre_original' => $f->getClientOriginalName(),
+                'extension'       => $f->getClientOriginalExtension(),
+                'tamano'          => $f->getSize(),
+                'item_id'         => $it['id'] ?? null,
+                'web_url'         => $it['webUrl'] ?? null,
+                'subido_por'      => $userId,
             ]);
+
             $otrosCount++;
             $items[] = ['tipo'=>'otros','nombre'=>$f->getClientOriginalName(),'url'=>$it['webUrl'] ?? null];
         }
@@ -230,5 +241,23 @@ class CargaExpedienteApiController extends Controller
             'progreso'=> ((int)$hasRequi + (int)$hasFactura + ($otrosCount>0 ? 1 : 0)).'/3',
             'items'   => $items,
         ]);
+    }
+
+    /* ======================= Helpers ======================= */
+
+    private function sanitizeFolderName(string $name): string
+    {
+        $name = preg_replace('/["*:<>?\/\\\\|#%]/', '-', $name);
+        return trim($name, ". ") ?: 'Carpeta';
+    }
+
+    /**
+     * Normaliza: si llega 1 archivo -> array de 1; si llega 'campo[]' -> ese array
+     */
+    private function filesFrom($request, string $key): array
+    {
+        
+        $files = $request->file($key);
+        return $files ? (is_array($files) ? $files : [$files]) : [];
     }
 }
