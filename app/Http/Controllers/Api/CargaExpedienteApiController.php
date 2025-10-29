@@ -209,24 +209,30 @@ class CargaExpedienteApiController extends Controller
             $items[]    = ['tipo'=>'factura','nombre'=>$f->getClientOriginalName(),'url'=>$it['webUrl'] ?? null];
         }
 
-        foreach ($this->filesFrom($request, 'recibos') as $i => $f) {
-            $name = time()."_RECIBO{$i}_".$f->getClientOriginalName();
-            $it   = $graph->upload($driveId, $recibosPath, $name, $f->getRealPath());
+        // Acepta ambos nombres: 'recibos' y 'otros'
+$recFiles = array_merge(
+    $this->filesFrom($request, 'recibos'),
+    $this->filesFrom($request, 'otros')
+);
 
-            ExpedienteArchivo::create([
-                'expediente_id'   => $expediente->id,
-                'tipo'            => 'otros', // mantenemos 'otros' en BD
-                'nombre_original' => $f->getClientOriginalName(),
-                'extension'       => $f->getClientOriginalExtension(),
-                'tamano'          => $f->getSize(),
-                'item_id'         => $it['id'] ?? null,
-                'web_url'         => $it['webUrl'] ?? null,
-                'subido_por'      => $userId,
-            ]);
+foreach ($recFiles as $i => $f) {
+    $name = time()."_RECIBO{$i}_".$f->getClientOriginalName();
+    $it   = $graph->upload($driveId, $recibosPath, $name, $f->getRealPath());
 
-            $otrosCount++;
-            $items[] = ['tipo'=>'otros','nombre'=>$f->getClientOriginalName(),'url'=>$it['webUrl'] ?? null];
-        }
+    ExpedienteArchivo::create([
+        'expediente_id'   => $expediente->id,
+        'tipo'            => 'otros', // mantenemos 'otros' en BD
+        'nombre_original' => $f->getClientOriginalName(),
+        'extension'       => $f->getClientOriginalExtension(),
+        'tamano'          => $f->getSize(),
+        'item_id'         => $it['id'] ?? null,
+        'web_url'         => $it['webUrl'] ?? null,
+        'subido_por'      => $userId,
+    ]);
+
+    $otrosCount++;
+    $items[] = ['tipo'=>'otros','nombre'=>$f->getClientOriginalName(),'url'=>$it['webUrl'] ?? null];
+}
 
         $expediente->update([
             'has_requi'   => $hasRequi,
