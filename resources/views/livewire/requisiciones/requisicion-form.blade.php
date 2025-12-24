@@ -22,27 +22,26 @@
     </div>
 
     <div>
-    <label class="block text-sm font-medium">Departamento quien solicita</label>
-    <select class="w-full mt-1 border-gray-300 rounded" wire:model="departamento_id">
-        <option value="">-- Selecciona --</option>
-        @foreach ($departamentos as $dep)
-            <option value="{{ $dep['id'] }}">{{ $dep['nombre'] }}</option>
-        @endforeach
-    </select>
-    @error('departamento_id') <p class="text-sm text-red-600">{{ $message }}</p> @enderror
-</div>
+        <label class="block text-sm font-medium">Departamento quien solicita</label>
+        <select class="w-full mt-1 border-gray-300 rounded" wire:model="departamento_id">
+            <option value="">-- Selecciona --</option>
+            @foreach ($departamentos as $dep)
+                <option value="{{ $dep['id'] }}">{{ $dep['nombre'] }}</option>
+            @endforeach
+        </select>
+        @error('departamento_id') <p class="text-sm text-red-600">{{ $message }}</p> @enderror
+    </div>
 
-<div>
-    <label class="block text-sm font-medium">Centro de costos (Departamento)</label>
-    <select class="w-full mt-1 border-gray-300 rounded" wire:model="centro_costo_id">
-        <option value="">-- Selecciona --</option>
-        @foreach ($departamentos as $dep)
-            <option value="{{ $dep['id'] }}">{{ $dep['nombre'] }}</option>
-        @endforeach
-    </select>
-    @error('centro_costo_id') <p class="text-sm text-red-600">{{ $message }}</p> @enderror
-</div>
-
+    <div>
+        <label class="block text-sm font-medium">Centro de costos (Departamento)</label>
+        <select class="w-full mt-1 border-gray-300 rounded" wire:model="centro_costo_id">
+            <option value="">-- Selecciona --</option>
+            @foreach ($departamentos as $dep)
+                <option value="{{ $dep['id'] }}">{{ $dep['nombre'] }}</option>
+            @endforeach
+        </select>
+        @error('centro_costo_id') <p class="text-sm text-red-600">{{ $message }}</p> @enderror
+    </div>
 
     <div>
         <label class="block text-sm font-medium">Justificación de la compra</label>
@@ -59,13 +58,17 @@
                     <th class="px-3 py-2 text-right">Cantidad</th>
                     <th class="px-3 py-2 text-left">Descripción</th>
                     <th class="px-3 py-2 text-left">Unidad</th>
-                    
+
+                    <th class="px-3 py-2 text-left">Proveedor</th>
+                    <th class="px-3 py-2 text-left">Ficha técnica</th>
+
                     <th class="px-3 py-2 text-right">Precio unitario</th>
                     <th class="px-3 py-2 text-left">Link</th>
                     <th class="px-3 py-2 text-right">Subtotal</th>
                     <th class="px-3 py-2"></th>
                 </tr>
             </thead>
+
             <tbody class="divide-y divide-gray-100">
                 @foreach ($items as $i => $row)
                     <tr wire:key="row-{{ $i }}">
@@ -74,32 +77,72 @@
                                    wire:model.debounce.300ms="items.{{ $i }}.cantidad">
                             @error("items.$i.cantidad") <p class="text-xs text-red-600">{{ $message }}</p> @enderror
                         </td>
+
                         <td class="px-3 py-2">
                             <input type="text" class="w-full border-gray-300 rounded"
                                    wire:model.lazy="items.{{ $i }}.descripcion"
                                    placeholder="Descripción del producto o servicio">
                             @error("items.$i.descripcion") <p class="text-xs text-red-600">{{ $message }}</p> @enderror
                         </td>
+
                         <td class="px-3 py-2">
                             <input type="text" class="w-full border-gray-300 rounded"
-                                   wire:model.lazy="items.{{ $i }}.unidad" placeholder="PZ, CJ, LTS...">
+                                   wire:model.lazy="items.{{ $i }}.unidad"
+                                   placeholder="PZ, CJ, LTS...">
                             @error("items.$i.unidad") <p class="text-xs text-red-600">{{ $message }}</p> @enderror
                         </td>
-                        
+
+                        {{-- Proveedor sugerido --}}
+                        <td class="px-3 py-2">
+                            <input type="text" class="w-full border-gray-300 rounded"
+                                   wire:model.lazy="items.{{ $i }}.proveedor_sugerido"
+                                   placeholder="Proveedor sugerido">
+                            @error("items.$i.proveedor_sugerido") <p class="text-xs text-red-600">{{ $message }}</p> @enderror
+                        </td>
+
+                        {{-- Ficha técnica --}}
+                        <td class="px-3 py-2">
+                            <input type="file"
+                                   class="w-full border-gray-300 rounded"
+                                   wire:model="fichas_tecnicas.{{ $i }}"
+                                   accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx">
+
+                            <div class="mt-1 text-xs text-gray-500"
+                                 wire:loading
+                                 wire:target="fichas_tecnicas.{{ $i }}">
+                                Subiendo archivo...
+                            </div>
+
+                            @error("fichas_tecnicas.$i") <p class="text-xs text-red-600">{{ $message }}</p> @enderror
+
+                            @if(!empty($row['ficha_tecnica_path']))
+                                <div class="mt-1 text-xs">
+                                    <a class="text-indigo-600 underline"
+                                       href="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($row['ficha_tecnica_path']) }}"
+                                       target="_blank">
+                                        {{ $row['ficha_tecnica_nombre'] ?? 'Ver archivo' }}
+                                    </a>
+                                </div>
+                            @endif
+                        </td>
+
                         <td class="px-3 py-2 text-right">
                             <input type="number" step="0.01" min="0" class="text-right border-gray-300 rounded w-28"
                                    wire:model.debounce.300ms="items.{{ $i }}.precio_unitario">
                             @error("items.$i.precio_unitario") <p class="text-xs text-red-600">{{ $message }}</p> @enderror
                         </td>
+
                         <td class="px-3 py-2">
                             <input type="url" class="w-full border-gray-300 rounded"
                                    wire:model.lazy="items.{{ $i }}.link_compra"
                                    placeholder="https://...">
                             @error("items.$i.link_compra") <p class="text-xs text-red-600">{{ $message }}</p> @enderror
                         </td>
+
                         <td class="px-3 py-2 text-right">
                             ${{ number_format($row['subtotal'] ?? 0, 2) }}
                         </td>
+
                         <td class="px-3 py-2 text-right">
                             <button type="button" class="text-red-600 hover:text-red-800"
                                     wire:click="removeItem({{ $i }})">Eliminar</button>
@@ -123,17 +166,17 @@
         </div>
 
         <div class="flex items-end gap-3">
-           <button type="button" wire:click.prevent="saveDraft"
-        wire:loading.attr="disabled" wire:target="saveDraft"
-        class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">
-            Guardar borrador
+            <button type="button" wire:click.prevent="saveDraft"
+                    wire:loading.attr="disabled" wire:target="saveDraft"
+                    class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">
+                Guardar borrador
             </button>
 
             <button type="button" wire:click.prevent="sendToApproval"
                     wire:loading.attr="disabled" wire:target="sendToApproval"
                     class="px-4 py-2 text-white bg-indigo-600 rounded hover:bg-indigo-700">
-            <span wire:loading.remove wire:target="sendToApproval">Enviar a aprobación</span>
-            <span wire:loading wire:target="sendToApproval">Enviando…</span>
+                <span wire:loading.remove wire:target="sendToApproval">Enviar a aprobación</span>
+                <span wire:loading wire:target="sendToApproval">Enviando…</span>
             </button>
         </div>
     </div>

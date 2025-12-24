@@ -5,92 +5,131 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use App\Models\User;
-use App\Models\Aprobacion;
 
 class Requisicion extends Model
 {
     protected $table = 'requisiciones';
-          protected $fillable = [
+
+    protected $fillable = [
         'folio','fecha_emision','solicitante_id',
-        'departamento_id','centro_costo_id', // <- nuevos
-        'departamento','centro_costo',       // (legacy texto, opcional)
+        'departamento_id','centro_costo_id',
+        'departamento','centro_costo',
         'justificacion','subtotal','iva','total','fecha_requerida','urgencia',
-        'estado','recibido_por_id','fecha_recibido','area_recibe'
+        'estado','recibido_por_id','fecha_recibido','area_recibe', 'recibe_nombre', 'firma_recepcion_path',
+        // 'aplica_iva' // <- solo si existe en tu tabla
     ];
 
     protected $casts = [
         'fecha_emision' => 'date',
         'fecha_requerida' => 'date',
         'fecha_recibido' => 'datetime',
+        // 'aplica_iva' => 'boolean', // <- solo si existe en tu tabla
     ];
-    public function departamentoRef(): BelongsTo {
+
+    // ✅ Nombres estándar (para tu Blade)
+    public function departamento(): BelongsTo
+    {
         return $this->belongsTo(\App\Models\Departamento::class, 'departamento_id');
     }
-    public function centroCostoRef(): BelongsTo {
+
+    public function centroCosto(): BelongsTo
+    {
         return $this->belongsTo(\App\Models\Departamento::class, 'centro_costo_id');
     }
 
-    public function solicitante(): BelongsTo {
-        return $this->belongsTo(User::class, 'solicitante_id');
-    }
-
-    public function recibidoPor(): BelongsTo {
-        return $this->belongsTo(User::class, 'recibido_por_id');
-    }
-
-    public function items(): HasMany {
-        return $this->hasMany(RequisicionItem::class);
-    }
-
-    public function aprobaciones(): HasMany {
-        return $this->hasMany(Aprobacion::class);
-    }
-    public function aprobacionPendiente(): ?Aprobacion
+    // 🔁 Alias (compatibilidad)
+    public function departamentoRef(): BelongsTo
     {
-        // si ya vienen cargadas evita N+1
-        if ($this->relationLoaded('aprobaciones')) {
-            return $this->aprobaciones
-                ->where('estado','pendiente')
-                ->sortBy('created_at')
-                ->first();
-        }
+        return $this->belongsTo(\App\Models\Departamento::class, 'departamento_id');
+    }
 
-        return $this->aprobaciones()
+    public function centroCostoRef(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\Departamento::class, 'centro_costo_id');
+    }
+
+    public function solicitante(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\User::class, 'solicitante_id');
+    }
+
+    public function recibidoPor(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\User::class, 'recibido_por_id');
+    }
+
+    public function items(): HasMany
+    {
+        return $this->hasMany(\App\Models\RequisicionItem::class);
+    }
+
+    public function aprobaciones(): HasMany
+    {
+        return $this->hasMany(\App\Models\Aprobacion::class);
+    }
+
+    public function aprobacionPendiente(): ?\App\Models\Aprobacion
+{
+    if ($this->relationLoaded('aprobaciones')) {
+        return $this->aprobaciones
             ->where('estado','pendiente')
-            ->orderBy('created_at')
+            ->sortBy(fn($a) => $a->nivel?->orden ?? 999)
             ->first();
     }
 
-    /** Si la pendiente le corresponde a $user, la retorna; si no, null */
+    return $this->aprobaciones()
+        ->where('estado','pendiente')
+        ->orderBy('created_at')
+        ->first();
+}
+
+
     public function aprobacionPendientePara(\App\Models\User $user): ?\App\Models\Aprobacion
-    {
-        $ap = $this->aprobacionPendiente();
-        if (!$ap) return null;
-
-        if ($ap->aprobador_id === $user->id) return $ap;
-
-        if ($ap->nivel) {
-            // Mapa por si en algún futuro un nivel acepta varios roles
-            $map = [
-                // 'direccion' => ['direccion'], // hoy es 1:1, pero lo dejamos listo
-            ];
-            $rol = $ap->nivel->rol_aprobador;
-            $rolesQueSirven = $map[$rol] ?? [$rol];
-
-            if ($user->hasAnyRole($rolesQueSirven)) return $ap;
-        }
-
-        return null;
-    }
-    public function scopeVisibleTo($query, User $user)
 {
-    // Admin y aprobadores ven todas
-    if ($user->hasAnyRole(['administrador','compras','gerente_area','gerencia_adm','direccion'])) {
+    $ap = $this->aprobacionPendiente();
+    if (!$ap) return null;
+
+    // 1) Si la aprobación es para una persona específica (aprobador_id), solo esa persona puede firmar
+    if (!is_null($ap->aprobador_id)) {
+        return ((int)$ap->aprobador_id === (int)$user->id) ? $ap : null;
+    }
+
+    // 2) Si NO hay aprobador_id, se firma por rol (ej. gerencia_adm)
+    $rol = $ap->nivel?->rol_aprobador;
+    if (!$rol) return null;
+
+    // ✅ Caso especial: gerente_area (si algún día lo dejas null por rol)
+    // Solo puede firmar si el usuario es el gerente asignado del departamento de la requisición
+    if ($rol === 'gerente_area') {
+        $gerenteId = $this->departamentoRef()->value('gerente_id'); // o $this->departamento()->value('gerente_id')
+        if ((int)$gerenteId !== (int)$user->id) return null;
+
+        return $user->hasRole('gerente_area') ? $ap : null;
+    }
+
+    // ✅ Caso típico: gerencia_adm firma por rol
+    return $user->hasRole($rol) ? $ap : null;
+}
+
+
+    // ✅ ESTE ES EL QUE TE ESTÁ FALTANDO (o se perdió)
+    public function scopeVisibleTo($query, \App\Models\User $user)
+{
+    // Roles con visibilidad total (ajusta a tus necesidades)
+    if ($user->hasAnyRole(['administrador','compras','gerencia_adm'])) {
         return $query;
     }
 
-    // Jefe: propias + de su equipo
+    // Gerente de área: ve lo suyo + lo de su área
+    if ($user->hasRole('gerente_area')) {
+        return $query->where(function ($q) use ($user) {
+            $q->where('solicitante_id', $user->id)
+              ->orWhereHas('solicitante', fn($u) => $u->where('supervisor_id', $user->id))
+              ->orWhereHas('departamentoRef', fn($d) => $d->where('gerente_id', $user->id));
+        });
+    }
+
+    // Jefe directo: ve lo suyo y sus subordinados
     if ($user->hasRole('jefe')) {
         return $query->where(function($q) use ($user) {
             $q->where('solicitante_id', $user->id)
@@ -98,7 +137,7 @@ class Requisicion extends Model
         });
     }
 
-    // Empleado (u otros roles “no aprobadores”): solo las propias
+    // Usuario normal: solo lo suyo
     return $query->where('solicitante_id', $user->id);
 }
 

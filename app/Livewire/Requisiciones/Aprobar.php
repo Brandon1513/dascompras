@@ -11,6 +11,8 @@ use App\Services\FlujoAprobacionService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Livewire\Component;
 
 class Aprobar extends Component
@@ -19,16 +21,20 @@ class Aprobar extends Component
 
     public Requisicion $requisicion;
     public string $comentarios = '';
+
     public ?Aprobacion $apPendiente = null;
+    public ?Aprobacion $siguientePendiente = null;
+    public bool $yaFirmoEnEstaReq = false;
+
+    public ?string $firma_base64 = null;
 
     public function mount(Requisicion $requisicion): void
     {
-        // Política (only users allowed to approve can view this page/component)
-        $this->authorize('approve', $requisicion);
+        // view para que no truene si recarga y ya no le toca
+        $this->authorize('view', $requisicion);
 
         $this->requisicion = $requisicion;
 
-        // Cargamos todo lo que mostramos
         $this->requisicion->load([
             'solicitante',
             'departamentoRef',
@@ -39,12 +45,18 @@ class Aprobar extends Component
         ]);
 
         $this->apPendiente = $this->miAprobacionPendiente();
+
+        $this->yaFirmoEnEstaReq = Aprobacion::where('requisicion_id', $this->requisicion->id)
+            ->where('aprobador_id', Auth::id())
+            ->whereIn('estado', ['aprobada', 'rechazada'])
+            ->exists();
+
+        $this->siguientePendiente = $this->aprobacionActualPendiente();
     }
 
-    /** Mapa de roles "lógicos" a 1+ roles reales (Spatie) */
+    /** Mapa de roles lógicos → roles reales (Spatie) */
     private function rolesQuePuedenFirmar(string $rolAprobador): array
     {
-        // ejemplo: una sola etapa puede ser firmada por varios roles reales
         $map = [
             'gerencia_alta' => ['gerencia_adm', 'gerencia_finanzas'],
         ];
@@ -52,79 +64,113 @@ class Aprobar extends Component
         return $map[$rolAprobador] ?? [$rolAprobador];
     }
 
-    /** Primera aprobación PENDIENTE que le corresponde al usuario actual */
+    /** ✅ Obtiene SOLO la aprobación actual: primera pendiente por orden de nivel */
+    private function aprobacionActualPendiente(): ?Aprobacion
+    {
+        return Aprobacion::query()
+            ->where('requisicion_id', $this->requisicion->id)
+            ->where('estado', 'pendiente')
+            ->leftJoin('niveles_aprobacion as na', 'na.id', '=', 'aprobaciones.nivel_aprobacion_id')
+            ->orderBy('na.orden')
+            ->orderBy('aprobaciones.id')
+            ->select('aprobaciones.*')
+            ->with(['nivel', 'aprobador'])
+            ->first();
+    }
+
+    /** ✅ Valida si el usuario puede firmar ESA aprobación */
+    private function puedeFirmar(Aprobacion $ap, User $user): bool
+    {
+        // Si está asignada a un usuario específico, solo él
+        if (!is_null($ap->aprobador_id)) {
+            return (int)$ap->aprobador_id === (int)$user->id;
+        }
+
+        // Si es por rol:
+        $rol = $ap->nivel?->rol_aprobador;
+        if (!$rol) return false;
+
+        // Caso especial: gerente_area por rol (por si alguna vez queda null)
+        if ($rol === 'gerente_area') {
+            $gerenteId = $this->requisicion->departamentoRef()->value('gerente_id');
+            if ((int)$gerenteId !== (int)$user->id) return false;
+            return $user->hasRole('gerente_area');
+        }
+
+        $roles = $this->rolesQuePuedenFirmar($rol);
+        return $user->hasAnyRole($roles);
+    }
+
+    /** ✅ La aprobación pendiente que me corresponde (solo si soy el que debe firmar AHORA) */
     private function miAprobacionPendiente(): ?Aprobacion
     {
         $user = Auth::user();
+        $apActual = $this->aprobacionActualPendiente();
+        if (!$apActual) return null;
 
-        $q = Aprobacion::query()
-            ->where('requisicion_id', $this->requisicion->id)
-            ->where('estado', 'pendiente')
-            ->orderBy('created_at');
-
-        // Candidatos (asignada a la persona o por rol)
-        $q->where(function ($qq) use ($user) {
-            $qq->where('aprobador_id', $user->id)
-               ->orWhereHas('nivel', function ($qn) {
-                    $qn->whereRaw('1=1'); // placeholder para mantener la OR
-               });
-        });
-
-        // Validación final en PHP (por mapeo de roles)
-        $ap = $q->with('nivel')->get()->first(function ($ap) use ($user) {
-            if ($ap->aprobador_id === $user->id) return true;
-            if (!$ap->nivel) return false;
-
-            $roles = $this->rolesQuePuedenFirmar($ap->nivel->rol_aprobador);
-            return $user->hasAnyRole($roles);
-        });
-
-        return $ap;
+        return $this->puedeFirmar($apActual, $user) ? $apActual : null;
     }
 
     public function approve()
     {
-        $siguiente = null;
+        if (!$this->firma_base64 || !str_starts_with($this->firma_base64, 'data:image/png;base64,')) {
+            $this->addError('firma_base64', 'Por favor firma antes de aprobar.');
+            return;
+        }
 
-        DB::transaction(function () use (&$siguiente) {
+        $siguiente = null;
+        $noMeToca = false;
+
+        DB::transaction(function () use (&$siguiente, &$noMeToca) {
             $ap = $this->miAprobacionPendiente();
-            abort_unless($ap, 403);
+
+            if (!$ap) {
+                $noMeToca = true;
+                return;
+            }
+
+            // Guardar la firma como PNG
+            $png  = base64_decode(Str::after($this->firma_base64, 'data:image/png;base64,'));
+            $path = "firmas/aprobaciones/req_{$this->requisicion->id}/ap_{$ap->id}.png";
+            Storage::disk('public')->put($path, $png);
 
             $ap->update([
                 'estado'       => 'aprobada',
                 'comentarios'  => $this->comentarios,
                 'firmado_en'   => now(),
                 'ip'           => request()->ip(),
+                // si venía null (firma por rol), registra quién fue
                 'aprobador_id' => $ap->aprobador_id ?: Auth::id(),
+                'firma_path'   => $path,
             ]);
 
-            // ¿Queda alguien pendiente?
-            $siguiente = Aprobacion::where('requisicion_id', $this->requisicion->id)
-                ->where('estado', 'pendiente')
-                ->orderBy('created_at')
-                ->first();
+            // Siguiente aprobación (primera pendiente por orden)
+            $siguiente = $this->aprobacionActualPendiente();
 
-            // Si nadie más está pendiente, cerrar la requisición
             if (!$siguiente) {
                 $this->requisicion->update(['estado' => 'aprobada_final']);
+            } else {
+                $this->requisicion->update(['estado' => 'en_aprobacion']);
             }
         });
 
-        // --- NOTIFICACIONES ---
+        if ($noMeToca) {
+            session()->flash('status', '✅ No hay aprobaciones pendientes para ti (o ya avanzó el flujo).');
+            return redirect()->route('requisiciones.index');
+        }
+
+        // Notificaciones
         if ($siguiente) {
-            // Notifica al siguiente aprobador (por persona o por rol)
             app(FlujoAprobacionService::class)->notificarSiguiente($this->requisicion);
         } else {
-            // Notifica aprobación final al solicitante (y si quieres, a Compras)
             optional($this->requisicion->solicitante)
                 ->notify(new RequisicionAprobadaFinal($this->requisicion));
 
-            // Ejemplo: avisar a todos con rol "compras"
             User::role('compras')->get()
                 ->each(fn (User $u) => $u->notify(new RequisicionAprobadaFinal($this->requisicion)));
         }
 
-        session()->flash('status', 'Aprobada correctamente.');
+        session()->flash('status', '✅ Aprobada correctamente. La requisición avanzó al siguiente nivel.');
         return redirect()->route('requisiciones.index');
     }
 
@@ -145,11 +191,10 @@ class Aprobar extends Component
             $this->requisicion->update(['estado' => 'rechazada']);
         });
 
-        // Notifica al solicitante el rechazo
         optional($this->requisicion->solicitante)
             ->notify(new RequisicionRechazada($this->requisicion, $this->comentarios));
 
-        session()->flash('status', 'Rechazada.');
+        session()->flash('status', '⛔ Rechazada. Se notificó al solicitante.');
         return redirect()->route('requisiciones.index');
     }
 

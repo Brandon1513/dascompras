@@ -51,6 +51,11 @@
               <th class="py-2">Cant.</th>
               <th class="py-2">Descripción</th>
               <th class="py-2">Unidad</th>
+
+              {{-- NUEVO --}}
+              <th class="py-2">Proveedor</th>
+              <th class="py-2">Ficha técnica</th>
+
               <th class="py-2 text-right">P. unit</th>
               <th class="py-2 text-right">Subtotal</th>
             </tr>
@@ -58,19 +63,42 @@
           <tbody class="divide-y">
             @forelse($requisicion->items as $it)
               <tr>
-                <td class="py-2">{{ rtrim(rtrim(number_format($it->cantidad,3,'.',''), '0'), '.') }}</td>
+                <td class="py-2">
+                  {{ rtrim(rtrim(number_format($it->cantidad,3,'.',''), '0'), '.') }}
+                </td>
+
                 <td class="py-2">
                   {{ $it->descripcion }}
                   @if($it->link_compra)
                     <a href="{{ $it->link_compra }}" target="_blank" rel="noopener" class="ml-2 text-indigo-600">link</a>
                   @endif
                 </td>
+
                 <td class="py-2">{{ $it->unidad }}</td>
+
+                {{-- NUEVO: Proveedor --}}
+                <td class="py-2">
+                  {{ $it->proveedor_sugerido ?: '—' }}
+                </td>
+
+                {{-- NUEVO: Ficha técnica --}}
+                <td class="py-2">
+                  @if($it->ficha_tecnica_path)
+                    <a class="text-indigo-600 hover:underline"
+                       href="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($it->ficha_tecnica_path) }}"
+                       target="_blank" rel="noopener">
+                      {{ $it->ficha_tecnica_nombre ?: 'Ver archivo' }}
+                    </a>
+                  @else
+                    —
+                  @endif
+                </td>
+
                 <td class="py-2 text-right">${{ number_format($it->precio_unitario,2) }}</td>
                 <td class="py-2 text-right">${{ number_format($it->subtotal,2) }}</td>
               </tr>
             @empty
-              <tr><td colspan="5" class="py-6 text-center text-gray-500">Sin partidas</td></tr>
+              <tr><td colspan="7" class="py-6 text-center text-gray-500">Sin partidas</td></tr>
             @endforelse
           </tbody>
         </table>
@@ -104,7 +132,7 @@
               </div>
               <span class="px-2 py-0.5 text-xs rounded
                 @class([
-                  'bg-amber-100 text-amber-800'   => $ap->estado==='pendiente',
+                  'bg-amber-100 text-amber-800'    => $ap->estado==='pendiente',
                   'bg-emerald-100 text-emerald-800'=> $ap->estado==='aprobada',
                   'bg-rose-100 text-rose-800'      => $ap->estado==='rechazada',
                 ])">

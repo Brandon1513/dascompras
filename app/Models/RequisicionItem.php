@@ -10,7 +10,8 @@ class RequisicionItem extends Model
     protected $table = 'requisicion_items';
     protected $fillable = [
         'requisicion_id','descripcion','unidad','cantidad',
-        'precio_unitario','subtotal','link_compra' // <- nuevo
+        'precio_unitario','subtotal','link_compra', 'proveedor_sugerido', 'ficha_tecnica_path',
+        'ficha_tecnica_nombre',// <- nuevo
     ];
 
     public function requisicion(): BelongsTo {

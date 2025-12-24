@@ -6,6 +6,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\EmpleadoController;
 use App\Http\Controllers\RequisicionController;
 use App\Http\Controllers\ExpedienteWebController;
+use App\Http\Controllers\DepartamentoGerenteController;
 Route::get('/', function () {
     return view('welcome');
 });
@@ -31,6 +32,18 @@ Route::middleware(['auth','role:administrador'])->group(function () {
     Route::patch('/empleados/{user}/toggle',[EmpleadoController::class,'toggle'])->name('empleados.toggle');
     Route::get('/empleados/{user}/resend', fn() => back()->with('success','Correo reenviado.'))
         ->name('empleados.resend');
+});
+//Departamentos
+
+Route::middleware(['auth','role:administrador'])->group(function () {
+    Route::get('/departamentos/gerentes', [DepartamentoGerenteController::class, 'index'])
+        ->name('departamentos.gerentes.index');
+
+    Route::get('/departamentos/{departamento}/gerente', [DepartamentoGerenteController::class, 'edit'])
+        ->name('departamentos.gerentes.edit');
+
+    Route::put('/departamentos/{departamento}/gerente', [DepartamentoGerenteController::class, 'update'])
+        ->name('departamentos.gerentes.update');
 });
 
 //expedientes
@@ -60,14 +73,18 @@ Route::middleware(['auth','active','role:administrador|compras'])->group(functio
 
 //requis
 
+// routes/web.php
 Route::middleware(['auth'])->group(function () {
-    Route::get('/requisiciones',       [RequisicionController::class, 'index'])->name('requisiciones.index');
+    Route::get('/requisiciones', [RequisicionController::class, 'index'])->name('requisiciones.index');
     Route::get('/requisiciones/crear', [RequisicionController::class, 'create'])->name('requisiciones.create');
     Route::get('/requisiciones/{requisicion}/editar', [RequisicionController::class, 'edit'])->name('requisiciones.edit');
-     Route::get('/requisiciones/{requisicion}', [RequisicionController::class,'show'])
-        ->name('requisiciones.show');
-        Route::get('/requisiciones/{requisicion}/recibir', Recibir::class)
-        ->name('requisiciones.recibir');
+
+    // PDF ANTES o DESPUÉS de show no afecta (no colisiona con /{requisicion})
+    Route::get('/requisiciones/{requisicion}/pdf', [RequisicionController::class, 'pdf'])
+        ->name('requisiciones.pdf')->whereNumber('requisicion');
+
+    Route::get('/requisiciones/{requisicion}', [RequisicionController::class,'show'])->name('requisiciones.show');
+    Route::get('/requisiciones/{requisicion}/recibir', Recibir::class)->name('requisiciones.recibir');
 });
 
 

@@ -17,9 +17,16 @@ class RequisicionPolicy
         if ($r->solicitante && $r->solicitante->supervisor_id === $user->id) return true;
 
         // Roles con visibilidad total
-        if ($user->hasAnyRole(['administrador','compras','gerente_area','gerencia_adm','direccion'])) return true;
+        if ($user->hasAnyRole(['administrador','compras','gerente_area','gerencia_adm'])) return true;
 
-        // Aprobadores que les toque esta requisición
+        // ✅ Si ya participó en esta requisición (aprobó/rechazó antes), también puede verla
+        if ($r->relationLoaded('aprobaciones')) {
+            if ($r->aprobaciones->where('aprobador_id', $user->id)->isNotEmpty()) return true;
+        } else {
+            if ($r->aprobaciones()->where('aprobador_id', $user->id)->exists()) return true;
+        }
+
+        // Aprobadores a los que les toca AHORA (pendiente)
         return (bool) $r->aprobacionPendientePara($user);
     }
 
@@ -32,7 +39,9 @@ class RequisicionPolicy
     /** Aprobar (cuando le toca firmar) */
     public function approve(User $user, Requisicion $r): bool
     {
-        return $r->estado === 'en_aprobacion' && (bool) $r->aprobacionPendientePara($user);
+        if (!in_array($r->estado, ['enviada','en_aprobacion'], true)) return false;
+
+        return (bool) $r->aprobacionPendientePara($user);
     }
 
     /** Registrar recepción (solicitante o compras, y ya aprobada) */

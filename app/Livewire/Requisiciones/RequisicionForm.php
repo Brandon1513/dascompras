@@ -9,16 +9,17 @@ use App\Models\Requisicion;
 use App\Models\Departamento;
 use Illuminate\Support\Carbon;
 use App\Models\NivelAprobacion;
-use App\Models\RequisicionItem;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Http\RedirectResponse;
 use App\Services\FlujoAprobacionService;
 use Illuminate\Validation\ValidationException;
-use Livewire\Features\SupportRedirects\Redirector;
+use Livewire\WithFileUploads;
+use Illuminate\Support\Facades\Storage;
 
 class RequisicionForm extends Component
 {
+    use WithFileUploads;
+
     // --- Cabecera ---
     public ?int $requisicionId = null;   // id al editar
     public bool $isEditing = false;
@@ -31,8 +32,26 @@ class RequisicionForm extends Component
     public string $solicitante_nombre = ''; // solo UI
 
     // --- Partidas ---
-    /** @var array<int, array{descripcion:string,unidad:?string,cantidad:float,precio_unitario:float,subtotal:float,link_compra:?string}> */
+    /**
+     * @var array<int, array{
+     *   descripcion:string,
+     *   unidad:?string,
+     *   cantidad:float,
+     *   precio_unitario:float,
+     *   subtotal:float,
+     *   link_compra:?string,
+     *   proveedor_sugerido:?string,
+     *   ficha_tecnica_path:?string,
+     *   ficha_tecnica_nombre:?string
+     * }>
+     */
     public array $items = [];
+
+    /**
+     * Archivos por partida (NO dentro de items, porque Livewire maneja mejor arrays separados)
+     * @var array<int, mixed> TemporaryUploadedFile|null
+     */
+    public array $fichas_tecnicas = [];
 
     public float $subtotal = 0;
     public float $iva = 0;
@@ -62,7 +81,7 @@ class RequisicionForm extends Component
             // Seguridad: solo dueño y en borrador
             abort_unless($req->solicitante_id === Auth::id() && $req->estado === 'borrador', 403);
 
-            // Prellenar
+            // Prellenar cabecera
             $this->fecha_emision   = $req->fecha_emision->toDateString();
             $this->urgencia        = $req->urgencia;
             $this->departamento_id = $req->departamento_id;
@@ -72,26 +91,39 @@ class RequisicionForm extends Component
             $this->iva             = (float) $req->iva;
             $this->total           = (float) $req->total;
 
+            // Partidas
             $this->items = $req->items->map(function ($it) {
                 return [
-                    'descripcion'     => $it->descripcion,
-                    'unidad'          => $it->unidad,
-                    'cantidad'        => (float) $it->cantidad,
-                    'precio_unitario' => (float) $it->precio_unitario,
-                    'subtotal'        => (float) $it->subtotal,
-                    'link_compra'     => $it->link_compra,
+                    'descripcion'          => $it->descripcion,
+                    'unidad'               => $it->unidad,
+                    'cantidad'             => (float) $it->cantidad,
+                    'precio_unitario'      => (float) $it->precio_unitario,
+                    'subtotal'             => (float) $it->subtotal,
+                    'link_compra'          => $it->link_compra,
+                    'proveedor_sugerido'   => $it->proveedor_sugerido,
+                    'ficha_tecnica_path'   => $it->ficha_tecnica_path,
+                    'ficha_tecnica_nombre' => $it->ficha_tecnica_nombre,
                 ];
             })->toArray();
+
+            // Archivos (vacío al inicio; solo se llena si suben uno nuevo)
+            $this->fichas_tecnicas = array_fill(0, count($this->items), null);
+
         } else {
             // Nuevo
             $this->items = [[
-                'descripcion' => '',
-                'unidad' => '',
-                'cantidad' => 1,
-                'precio_unitario' => 0,
-                'subtotal' => 0,
-                'link_compra' => '',
+                'descripcion'          => '',
+                'unidad'               => '',
+                'cantidad'             => 1,
+                'precio_unitario'      => 0,
+                'subtotal'             => 0,
+                'link_compra'          => '',
+                'proveedor_sugerido'   => '',
+                'ficha_tecnica_path'   => null,
+                'ficha_tecnica_nombre' => null,
             ]];
+
+            $this->fichas_tecnicas = [null];
         }
 
         $this->recalcularTotales();
@@ -106,13 +138,18 @@ class RequisicionForm extends Component
     public function addItem(): void
     {
         $this->items[] = [
-            'descripcion' => '',
-            'unidad' => '',
-            'cantidad' => 1,
-            'precio_unitario' => 0,
-            'subtotal' => 0,
-            'link_compra' => '',
+            'descripcion'          => '',
+            'unidad'               => '',
+            'cantidad'             => 1,
+            'precio_unitario'      => 0,
+            'subtotal'             => 0,
+            'link_compra'          => '',
+            'proveedor_sugerido'   => '',
+            'ficha_tecnica_path'   => null,
+            'ficha_tecnica_nombre' => null,
         ];
+
+        $this->fichas_tecnicas[] = null;
     }
 
     public function removeItem(int $index): void
@@ -120,6 +157,10 @@ class RequisicionForm extends Component
         if (count($this->items) > 1) {
             unset($this->items[$index]);
             $this->items = array_values($this->items);
+
+            unset($this->fichas_tecnicas[$index]);
+            $this->fichas_tecnicas = array_values($this->fichas_tecnicas);
+
             $this->recalcularTotales();
         }
     }
@@ -136,9 +177,11 @@ class RequisicionForm extends Component
             $cant = (float) ($row['cantidad'] ?? 0);
             $pu   = (float) ($row['precio_unitario'] ?? 0);
             $sub  = round($cant * $pu, 2);
+
             $this->items[$i]['subtotal'] = $sub;
             $subtotal += $sub;
         }
+
         $this->subtotal = round($subtotal, 2);
         $this->iva      = round($this->subtotal * self::IVA_RATE, 2);
         $this->total    = round($this->subtotal + $this->iva, 2);
@@ -154,12 +197,17 @@ class RequisicionForm extends Component
             'centro_costo_id'  => ['required', 'exists:departamentos,id'],
             'justificacion'    => ['required', 'string', 'min:5'],
 
-            'items'                   => ['required', 'array', 'min:1'],
-            'items.*.descripcion'     => ['required', 'string', 'min:2', 'max:255'],
-            'items.*.unidad'          => ['nullable', 'string', 'max:20'],
-            'items.*.cantidad'        => ['required', 'numeric', 'gt:0'],
-            'items.*.precio_unitario' => ['required', 'numeric', 'gte:0'],
-            'items.*.link_compra'     => ['nullable', 'string', 'max:255'], // usa 'url' si quieres forzar formato
+            'items'                       => ['required', 'array', 'min:1'],
+            'items.*.descripcion'         => ['required', 'string', 'min:2', 'max:255'],
+            'items.*.unidad'              => ['nullable', 'string', 'max:20'],
+            'items.*.cantidad'            => ['required', 'numeric', 'gt:0'],
+            'items.*.precio_unitario'     => ['required', 'numeric', 'gte:0'],
+            'items.*.link_compra'         => ['nullable', 'string', 'max:255'],
+            'items.*.proveedor_sugerido'  => ['nullable', 'string', 'max:255'],
+
+            // Archivos por partida
+            'fichas_tecnicas'     => ['array'],
+            'fichas_tecnicas.*'   => ['nullable', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,doc,docx,xls,xlsx'],
         ];
     }
 
@@ -183,13 +231,10 @@ class RequisicionForm extends Component
 
     public function sendToApproval()
     {
-        // guarda y pasa a 'en_aprobacion'
         $req = $this->persist('en_aprobacion');
 
-        //Crear cadena de aprobacion
         $this->crearCadenaAprobacion($req);
 
-        // notifica al siguiente aprobador
         app(FlujoAprobacionService::class)->notificarSiguiente($req);
 
         session()->flash('status', 'Requisición enviada. Pasará al flujo de aprobación.');
@@ -206,7 +251,6 @@ class RequisicionForm extends Component
             if ($this->isEditing && $this->requisicionId) {
                 $req = Requisicion::with('items')->findOrFail($this->requisicionId);
 
-                // seguridad
                 abort_unless($req->solicitante_id === Auth::id() && $req->estado === 'borrador', 403);
 
                 $req->update([
@@ -221,24 +265,45 @@ class RequisicionForm extends Component
                     'estado'          => $estado,
                 ]);
 
+                // BORRAMOS items y los recreamos, PERO conservando archivos si no suben nuevo
                 $req->items()->delete();
-                foreach ($this->items as $row) {
+
+                foreach ($this->items as $i => $row) {
+                    $oldPath = $row['ficha_tecnica_path'] ?? null;
+                    $oldName = $row['ficha_tecnica_nombre'] ?? null;
+
+                    $upload = $this->fichas_tecnicas[$i] ?? null;
+
+                    $finalPath = $oldPath;
+                    $finalName = $oldName;
+
+                    // Si subieron nuevo archivo para esta partida: borrar anterior + guardar nuevo
+                    if ($upload) {
+                        if ($oldPath) {
+                            Storage::disk('public')->delete($oldPath);
+                        }
+                        $finalName = $upload->getClientOriginalName();
+                        $finalPath = $upload->store('requisiciones/fichas', 'public');
+                    }
+
                     $req->items()->create([
-                        'descripcion'     => $row['descripcion'],
-                        'unidad'          => $row['unidad'] ?: null,
-                        'cantidad'        => (float) $row['cantidad'],
-                        'precio_unitario' => (float) $row['precio_unitario'],
-                        'subtotal'        => (float) $row['subtotal'],
-                        'link_compra'     => $row['link_compra'] ?: null,
+                        'descripcion'          => $row['descripcion'],
+                        'unidad'               => $row['unidad'] ?: null,
+                        'cantidad'             => (float) $row['cantidad'],
+                        'precio_unitario'      => (float) $row['precio_unitario'],
+                        'subtotal'             => (float) ($row['subtotal'] ?? 0),
+                        'link_compra'          => $row['link_compra'] ?: null,
+                        'proveedor_sugerido'   => $row['proveedor_sugerido'] ?: null,
+                        'ficha_tecnica_path'   => $finalPath,
+                        'ficha_tecnica_nombre' => $finalName,
                     ]);
                 }
 
-                $this->requisicionId = $req->id; // <-- asegúrate de guardar el id
+                $this->requisicionId = $req->id;
                 return $req;
 
             } else {
-                // crear nueva
-                $fecha = \Illuminate\Support\Carbon::parse($this->fecha_emision);
+                $fecha = Carbon::parse($this->fecha_emision);
 
                 $req = Requisicion::create([
                     'folio'           => $this->generateFolio($fecha),
@@ -254,18 +319,31 @@ class RequisicionForm extends Component
                     'estado'          => $estado,
                 ]);
 
-                foreach ($this->items as $row) {
+                foreach ($this->items as $i => $row) {
+                    $upload = $this->fichas_tecnicas[$i] ?? null;
+
+                    $finalPath = null;
+                    $finalName = null;
+
+                    if ($upload) {
+                        $finalName = $upload->getClientOriginalName();
+                        $finalPath = $upload->store('requisiciones/fichas', 'public');
+                    }
+
                     $req->items()->create([
-                        'descripcion'     => $row['descripcion'],
-                        'unidad'          => $row['unidad'] ?: null,
-                        'cantidad'        => (float) $row['cantidad'],
-                        'precio_unitario' => (float) $row['precio_unitario'],
-                        'subtotal'        => (float) $row['subtotal'],
-                        'link_compra'     => $row['link_compra'] ?: null,
+                        'descripcion'          => $row['descripcion'],
+                        'unidad'               => $row['unidad'] ?: null,
+                        'cantidad'             => (float) $row['cantidad'],
+                        'precio_unitario'      => (float) $row['precio_unitario'],
+                        'subtotal'             => (float) ($row['subtotal'] ?? 0),
+                        'link_compra'          => $row['link_compra'] ?: null,
+                        'proveedor_sugerido'   => $row['proveedor_sugerido'] ?: null,
+                        'ficha_tecnica_path'   => $finalPath,
+                        'ficha_tecnica_nombre' => $finalName,
                     ]);
                 }
 
-                $this->requisicionId = $req->id; // <-- guarda el id recién creado
+                $this->requisicionId = $req->id;
                 return $req;
             }
         });
@@ -273,79 +351,106 @@ class RequisicionForm extends Component
 
     // ---------- Cadena de aprobación ----------
     private function crearCadenaAprobacion(Requisicion $req): void
-{
-    // Limpia por si se reenvía
-    $req->aprobaciones()->delete();
+    {
+        $req->aprobaciones()->delete();
 
-    // -------- 1) Jefe directo --------
-    $nivelJefeId = NivelAprobacion::where('rol_aprobador', 'jefe')->value('id');
-    $jefeId      = $this->resolverJefeDirecto($req->solicitante_id); // users.supervisor_id
+        $nivelJefe = NivelAprobacion::query()
+            ->where('rol_aprobador', 'jefe')
+            ->where('activo', true)
+            ->first();
 
-    if ($jefeId && $nivelJefeId) {
+        $nivelArea = NivelAprobacion::query()
+            ->where('rol_aprobador', 'gerente_area')
+            ->where('activo', true)
+            ->first();
+
+        if (!$nivelJefe || !$nivelArea) {
+            throw ValidationException::withMessages([
+                'aprobaciones' => "Faltan niveles activos base (jefe / gerente_area) en niveles_aprobacion.",
+            ]);
+        }
+
+        $jefeId = $this->resolverJefeDirecto($req->solicitante_id);
+
+        if (!$jefeId) {
+            throw ValidationException::withMessages([
+                'aprobaciones' => 'El solicitante no tiene jefe directo asignado (users.supervisor_id).',
+            ]);
+        }
+
         Aprobacion::create([
             'requisicion_id'      => $req->id,
-            'nivel_aprobacion_id' => $nivelJefeId,
+            'nivel_aprobacion_id' => $nivelJefe->id,
             'aprobador_id'        => $jefeId,
             'estado'              => 'pendiente',
         ]);
-    } elseif (!$nivelJefeId) {
-        // Lanza error claro si falta la config base
-        throw ValidationException::withMessages([
-            'aprobaciones' => "No existe el nivel 'jefe' en la tabla niveles_aprobacion.",
-        ]);
-    }
 
-    // 1) Nivel por monto
-    $nivel = NivelAprobacion::where('rol_aprobador','!=','jefe')
-        ->where('monto_min','<=',$req->total)
-        ->where(function($q) use ($req){
-            $q->whereNull('monto_max')->orWhere('monto_max','>=',$req->total);
-        })
-        ->orderBy('orden')
-        ->first();
+        $req->loadMissing('departamentoRef');
 
-    if ($nivel) {
-        // Para niveles por rol (compras / operaciones) puedes dejar aprobador_id null
-        // y aprobarán por pertenecer al rol. Para "gerencia_alta" igual.
+        $gerenteAreaId = $req->departamentoRef?->gerente_id;
+
+        if (!$gerenteAreaId) {
+            throw ValidationException::withMessages([
+                'aprobaciones' => 'El departamento no tiene gerente asignado (departamentos.gerente_id).',
+            ]);
+        }
+
         Aprobacion::create([
             'requisicion_id'      => $req->id,
-            'nivel_aprobacion_id' => $nivel->id,
-            'aprobador_id'        => null,     // firma por rol
+            'nivel_aprobacion_id' => $nivelArea->id,
+            'aprobador_id'        => $gerenteAreaId,
             'estado'              => 'pendiente',
         ]);
+
+        $totalCentavos  = (int) round(((float) $req->total) * 100);
+        $limiteCentavos = 500000; // 5000.00 * 100
+
+        if ($totalCentavos > $limiteCentavos) {
+            $nivelAdm = NivelAprobacion::query()
+                ->where('rol_aprobador', 'gerencia_adm')
+                ->where('activo', true)
+                ->first();
+
+            if (!$nivelAdm) {
+                throw ValidationException::withMessages([
+                    'aprobaciones' => "No existe un nivel activo para 'gerencia_adm' en niveles_aprobacion.",
+                ]);
+            }
+
+            Aprobacion::create([
+                'requisicion_id'      => $req->id,
+                'nivel_aprobacion_id' => $nivelAdm->id,
+                'aprobador_id'        => null,
+                'estado'              => 'pendiente',
+            ]);
+        }
     }
-}
 
     private function resolverJefeDirecto(int $empleadoId): ?int
     {
-        // Ajusta a tu esquema real (por ejemplo, columna supervisor_id en users)
-        return User::where('id',$empleadoId)->value('supervisor_id');
+        return User::where('id', $empleadoId)->value('supervisor_id');
     }
 
     private function findUserIdByRole(string $role): ?int
     {
-        // Spatie
         return User::role($role)->value('id');
     }
 
-    /** Devuelve el nivel cuyo rango contiene el monto (excluye jefe_directo) */
     private function nivelPorMonto(float $total): ?NivelAprobacion
     {
-        return NivelAprobacion::where('rol_aprobador','!=','jefe')
-            ->where('monto_min','<=',$total)
-            ->where(fn($q)=>$q->where('monto_max','>=',$total)->orWhereNull('monto_max'))
+        return NivelAprobacion::where('rol_aprobador', '!=', 'jefe')
+            ->where('monto_min', '<=', $total)
+            ->where(fn ($q) => $q->where('monto_max', '>=', $total)->orWhereNull('monto_max'))
             ->orderBy('orden')
             ->first();
     }
-        /** Devuelve los roles reales admitidos por un nivel */
+
     private function rolesQuePuedenFirmar(string $rolAprobador): array
     {
-        // Mapa de rol "lógico" → 1 o más roles reales de Spatie
         $map = [
-            'gerencia_alta' => ['gerencia_adm','gerencia_finanzas'],
+            'gerencia_alta' => ['gerencia_adm', 'gerencia_finanzas'],
         ];
 
         return $map[$rolAprobador] ?? [$rolAprobador];
     }
-
 }
