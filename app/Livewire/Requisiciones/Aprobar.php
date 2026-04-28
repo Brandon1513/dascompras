@@ -39,7 +39,9 @@ class Aprobar extends Component
             'solicitante',
             'departamentoRef',
             'centroCostoRef',
-            'items',
+            'items.unidadMedida',
+            'items.tipoImpuesto',
+            'items.archivos',
             'aprobaciones.nivel',
             'aprobaciones.aprobador',
         ]);
@@ -171,7 +173,7 @@ class Aprobar extends Component
         }
 
         session()->flash('status', '✅ Aprobada correctamente. La requisición avanzó al siguiente nivel.');
-        return redirect()->route('requisiciones.index');
+        $this->js("window.location.href = '" . route('requisiciones.index') . "'");
     }
 
     public function reject()
@@ -195,7 +197,7 @@ class Aprobar extends Component
             ->notify(new RequisicionRechazada($this->requisicion, $this->comentarios));
 
         session()->flash('status', '⛔ Rechazada. Se notificó al solicitante.');
-        return redirect()->route('requisiciones.index');
+        $this->js("window.location.href = '" . route('requisiciones.index') . "'");
     }
 
     public function render()

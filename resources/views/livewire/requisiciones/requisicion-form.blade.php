@@ -1,183 +1,480 @@
-<div class="space-y-6">
-    <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <div class="md:col-span-1">
-            <label class="block text-sm font-medium">Fecha de elaboración</label>
-            <input type="date" class="w-full mt-1 border-gray-300 rounded" wire:model.lazy="fecha_emision">
-            @error('fecha_emision') <p class="text-sm text-red-600">{{ $message }}</p> @enderror
+<div class="min-h-screen py-6" style="background: linear-gradient(160deg, #f8f5ff 0%, #f1f5f9 50%, #f8f5ff 100%);">
+<div class="max-w-5xl px-4 mx-auto space-y-4 sm:px-6 lg:px-8">
+
+    {{-- Error general --}}
+    @error('general')
+        <div class="flex items-center gap-2 p-4 text-sm font-medium text-red-800 border border-red-200 rounded-xl bg-red-50">
+            ⚠️ {{ $message }}
         </div>
+    @enderror
 
-        <div class="md:col-span-1">
-            <label class="block text-sm font-medium">Urgencia</label>
-            <select class="w-full mt-1 border-gray-300 rounded" wire:model="urgencia">
-                <option value="normal">Normal</option>
-                <option value="urgente">Urgente</option>
-            </select>
-            @error('urgencia') <p class="text-sm text-red-600">{{ $message }}</p> @enderror
+    {{-- ══ LEYENDA ══════════════════════════════════════════════════════ --}}
+    <div class="flex items-start gap-3 px-4 py-3 border rounded-xl border-amber-200/80 bg-amber-50/80">
+        <svg class="w-4 h-4 text-amber-500 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+        </svg>
+        <p class="text-xs font-medium text-amber-800">
+            El seguimiento al flujo de aprobación es responsabilidad del solicitante y superiores.
+        </p>
+    </div>
+
+    {{-- Banner rechazo por compras --}}
+    @if($estado_actual === 'rechazada_compras')
+    <div class="overflow-hidden border border-orange-200 rounded-xl bg-orange-50">
+        <div class="flex items-center gap-2 px-4 py-2 bg-orange-100 border-b border-orange-200">
+            <span class="text-sm">↩️</span>
+            <span class="text-xs font-bold tracking-wider text-orange-800 uppercase">Requisición rechazada — Requiere correcciones</span>
         </div>
-
-        <div class="md:col-span-2">
-            <label class="block text-sm font-medium">Solicitante</label>
-            <input type="text" class="w-full mt-1 bg-gray-100 border-gray-300 rounded" value="{{ $solicitante_nombre }}" readonly>
+        @if(isset($requisicion) && $requisicion->motivo_rechazo_compras)
+        <div class="px-4 py-3">
+            <p class="text-sm text-orange-700 whitespace-pre-line">{{ $requisicion->motivo_rechazo_compras }}</p>
+            @if($requisicion->revisadoPor)
+            <p class="mt-2 text-xs text-orange-400">
+                Revisado por {{ $requisicion->revisadoPor->name }}
+                @if($requisicion->revisado_en)· {{ $requisicion->revisado_en->format('d/m/Y H:i') }}@endif
+            </p>
+            @endif
         </div>
+        @endif
     </div>
+    @endif
 
-    <div>
-        <label class="block text-sm font-medium">Departamento quien solicita</label>
-        <select class="w-full mt-1 border-gray-300 rounded" wire:model="departamento_id">
-            <option value="">-- Selecciona --</option>
-            @foreach ($departamentos as $dep)
-                <option value="{{ $dep['id'] }}">{{ $dep['nombre'] }}</option>
-            @endforeach
-        </select>
-        @error('departamento_id') <p class="text-sm text-red-600">{{ $message }}</p> @enderror
-    </div>
+    {{-- ══ DATOS GENERALES ══════════════════════════════════════════════ --}}
+    <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-xl">
+        <div class="flex items-center gap-2 px-5 py-3 border-b border-gray-100"
+             style="background: linear-gradient(90deg, #4A1660 0%, #6d28d9 100%);">
+            <svg class="w-4 h-4 text-white/70" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            <h3 class="text-xs font-bold tracking-widest text-white uppercase">Datos generales</h3>
+        </div>
+        <div class="p-5 space-y-4">
 
-    <div>
-        <label class="block text-sm font-medium">Centro de costos (Departamento)</label>
-        <select class="w-full mt-1 border-gray-300 rounded" wire:model="centro_costo_id">
-            <option value="">-- Selecciona --</option>
-            @foreach ($departamentos as $dep)
-                <option value="{{ $dep['id'] }}">{{ $dep['nombre'] }}</option>
-            @endforeach
-        </select>
-        @error('centro_costo_id') <p class="text-sm text-red-600">{{ $message }}</p> @enderror
-    </div>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div>
+                    <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Fecha de elaboración</label>
+                    <input type="date" wire:model.lazy="fecha_emision"
+                           class="w-full rounded-lg border-gray-200 text-sm shadow-sm focus:ring-purple-500 focus:border-purple-500
+                                  @error('fecha_emision') border-red-400 @enderror">
+                    @error('fecha_emision') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                </div>
 
-    <div>
-        <label class="block text-sm font-medium">Justificación de la compra</label>
-        <textarea rows="3" class="w-full mt-1 border-gray-300 rounded"
-                  wire:model.lazy="justificacion"
-                  placeholder="Describe la necesidad o motivo de la compra..."></textarea>
-        @error('justificacion') <p class="text-sm text-red-600">{{ $message }}</p> @enderror
-    </div>
+                <div>
+                    <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Urgencia</label>
+                    <select wire:model="urgencia"
+                            class="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                        <option value="normal">Normal</option>
+                        <option value="urgente">🔴 Urgente</option>
+                    </select>
+                </div>
 
-    <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-                <tr class="text-xs tracking-wider text-gray-700 uppercase">
-                    <th class="px-3 py-2 text-right">Cantidad</th>
-                    <th class="px-3 py-2 text-left">Descripción</th>
-                    <th class="px-3 py-2 text-left">Unidad</th>
+                <div class="sm:col-span-2">
+                    <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Solicitante</label>
+                    <input type="text" value="{{ $solicitante_nombre }}" readonly
+                           class="w-full text-sm text-gray-400 border-gray-100 rounded-lg shadow-sm cursor-not-allowed bg-gray-50">
+                </div>
+            </div>
 
-                    <th class="px-3 py-2 text-left">Proveedor</th>
-                    <th class="px-3 py-2 text-left">Ficha técnica</th>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                    <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                        Departamento solicitante <span class="text-red-400">*</span>
+                    </label>
+                    <select wire:model="departamento_id"
+                            class="w-full rounded-lg border-gray-200 text-sm shadow-sm focus:ring-purple-500 focus:border-purple-500
+                                   @error('departamento_id') border-red-400 @enderror">
+                        <option value="">— Selecciona —</option>
+                        @foreach ($departamentos as $dep)
+                            <option value="{{ $dep['id'] }}">{{ $dep['nombre'] }}</option>
+                        @endforeach
+                    </select>
+                    @error('departamento_id') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                </div>
 
-                    <th class="px-3 py-2 text-right">Precio unitario</th>
-                    <th class="px-3 py-2 text-left">Link</th>
-                    <th class="px-3 py-2 text-right">Subtotal</th>
-                    <th class="px-3 py-2"></th>
-                </tr>
-            </thead>
+                <div>
+                    <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                        Centro de costos <span class="text-red-400">*</span>
+                    </label>
+                    <select wire:model="centro_costo_id"
+                            class="w-full rounded-lg border-gray-200 text-sm shadow-sm focus:ring-purple-500 focus:border-purple-500
+                                   @error('centro_costo_id') border-red-400 @enderror">
+                        <option value="">— Selecciona —</option>
+                        @foreach ($departamentos as $dep)
+                            <option value="{{ $dep['id'] }}">{{ $dep['nombre'] }}</option>
+                        @endforeach
+                    </select>
+                    @error('centro_costo_id') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                </div>
+            </div>
 
-            <tbody class="divide-y divide-gray-100">
-                @foreach ($items as $i => $row)
-                    <tr wire:key="row-{{ $i }}">
-                        <td class="px-3 py-2 text-right">
-                            <input type="number" step="0.001" min="0" class="w-24 text-right border-gray-300 rounded"
-                                   wire:model.debounce.300ms="items.{{ $i }}.cantidad">
-                            @error("items.$i.cantidad") <p class="text-xs text-red-600">{{ $message }}</p> @enderror
-                        </td>
+            <div>
+                <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    Justificación de la compra <span class="text-red-400">*</span>
+                </label>
+                <textarea rows="3" wire:model.lazy="justificacion"
+                          placeholder="Describe la necesidad o motivo de la compra..."
+                          class="w-full rounded-lg border-gray-200 text-sm shadow-sm focus:ring-purple-500 focus:border-purple-500 resize-none
+                                 @error('justificacion') border-red-400 @enderror"></textarea>
+                @error('justificacion') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+            </div>
+            <div class="flex flex-wrap px-1 gap-x-8 gap-y-2">
+ 
+                    <div class="flex items-start gap-2">
+                        <span class="text-base shrink-0 mt-0.5">📅</span>
+                        <p class="text-xs leading-relaxed text-gray-500">
+                            <span class="font-semibold text-gray-700">Plazo de entrega:</span>
+                            El plazo máximo es de <strong class="text-gray-700">15 días naturales</strong>
+                            a partir de la orden de compra, salvo casos especiales informados al solicitante.
+                        </p>
+                    </div>
+                
+                    <div class="flex items-start gap-2">
+                        <span class="text-base shrink-0 mt-0.5">💰</span>
+                        <p class="text-xs leading-relaxed text-gray-500">
+                            <span class="font-semibold text-gray-700">Programación de pagos:</span>
+                            Para que el pago aplique en la semana en curso, la factura debe recibirse a más tardar el
+                            <strong class="text-gray-700">lunes a las 12:00 pm</strong>.
+                        </p>
+                    </div>
+                
+                </div>
 
-                        <td class="px-3 py-2">
-                            <input type="text" class="w-full border-gray-300 rounded"
-                                   wire:model.lazy="items.{{ $i }}.descripcion"
-                                   placeholder="Descripción del producto o servicio">
-                            @error("items.$i.descripcion") <p class="text-xs text-red-600">{{ $message }}</p> @enderror
-                        </td>
 
-                        <td class="px-3 py-2">
-                            <input type="text" class="w-full border-gray-300 rounded"
-                                   wire:model.lazy="items.{{ $i }}.unidad"
-                                   placeholder="PZ, CJ, LTS...">
-                            @error("items.$i.unidad") <p class="text-xs text-red-600">{{ $message }}</p> @enderror
-                        </td>
+            {{-- Toggle pago de factura --}}
+            <div class="pt-1 space-y-4">
+                <div class="flex items-center gap-3">
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" wire:model.live="es_pago_factura" class="sr-only peer">
+                        <div class="w-10 h-5 bg-gray-200 rounded-full peer peer-checked:bg-purple-600 transition-colors duration-200
+                                    after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full
+                                    after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-5"></div>
+                    </label>
+                    <div>
+                        <span class="text-sm font-semibold text-gray-700">Es pago de factura</span>
+                        <p class="text-xs text-gray-400">Actívalo si es para pagar una factura existente. <strong class="text-gray-600">Se requiere adjuntar la factura.</strong></p>
+                    </div>
+                </div>
 
-                        {{-- Proveedor sugerido --}}
-                        <td class="px-3 py-2">
-                            <input type="text" class="w-full border-gray-300 rounded"
-                                   wire:model.lazy="items.{{ $i }}.proveedor_sugerido"
-                                   placeholder="Proveedor sugerido">
-                            @error("items.$i.proveedor_sugerido") <p class="text-xs text-red-600">{{ $message }}</p> @enderror
-                        </td>
+                @if($es_pago_factura)
+                <div class="p-4 space-y-3 border-2 border-purple-300 border-dashed rounded-xl bg-purple-50/50">
+                    <div class="flex items-center gap-2">
+                        <svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        <span class="text-sm font-bold text-purple-700">
+                            Factura adjunta <span class="text-red-500">*</span>
+                        </span>
+                        <span class="text-xs text-purple-400">(PDF, JPG o PNG · máx. 10 MB)</span>
+                    </div>
 
-                        {{-- Ficha técnica --}}
-                        <td class="px-3 py-2">
-                            <input type="file"
-                                   class="w-full border-gray-300 rounded"
-                                   wire:model="fichas_tecnicas.{{ $i }}"
-                                   accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx">
-
-                            <div class="mt-1 text-xs text-gray-500"
-                                 wire:loading
-                                 wire:target="fichas_tecnicas.{{ $i }}">
-                                Subiendo archivo...
-                            </div>
-
-                            @error("fichas_tecnicas.$i") <p class="text-xs text-red-600">{{ $message }}</p> @enderror
-
-                            @if(!empty($row['ficha_tecnica_path']))
-                                <div class="mt-1 text-xs">
-                                    <a class="text-indigo-600 underline"
-                                       href="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($row['ficha_tecnica_path']) }}"
-                                       target="_blank">
-                                        {{ $row['ficha_tecnica_nombre'] ?? 'Ver archivo' }}
+                    @if($factura_path)
+                        <div class="flex items-center justify-between p-3 bg-white border border-purple-200 rounded-xl">
+                            <div class="flex items-center min-w-0 gap-2">
+                                <span class="text-xl">📄</span>
+                                <div class="min-w-0">
+                                    <a href="{{ Storage::disk('public')->url($factura_path) }}" target="_blank"
+                                       class="block max-w-xs text-sm font-semibold text-purple-600 truncate hover:underline">
+                                        {{ $factura_nombre ?? 'Factura' }}
                                     </a>
+                                    <p class="text-xs text-gray-400">Factura adjunta</p>
                                 </div>
+                            </div>
+                            <button type="button" wire:click="removeFactura"
+                                    wire:confirm="¿Eliminar la factura?"
+                                    class="ml-3 text-xs font-semibold text-red-500 hover:text-red-700 shrink-0">
+                                Eliminar
+                            </button>
+                        </div>
+                    @else
+                        <label class="flex items-center justify-center gap-3 p-4 transition-colors bg-white border border-purple-200 cursor-pointer rounded-xl hover:bg-purple-50">
+                            <svg class="w-6 h-6 text-purple-300" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                            </svg>
+                            <div class="text-center">
+                                <span class="text-sm font-semibold text-purple-600">Subir factura</span>
+                                <p class="text-xs text-purple-400 mt-0.5">PDF, JPG o PNG</p>
+                            </div>
+                            <input type="file" wire:model="factura_nueva" accept=".pdf,.jpg,.jpeg,.png" class="hidden">
+                        </label>
+                        <div wire:loading wire:target="factura_nueva" class="flex items-center gap-2 text-xs text-purple-500">
+                            <svg class="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                            </svg>
+                            Subiendo...
+                        </div>
+                        @if($factura_nueva)
+                        <div class="flex items-center gap-2 p-2 text-xs text-gray-500 bg-white border border-purple-100 rounded-lg">
+                            <span>📄</span>
+                            <span class="truncate">{{ $factura_nueva->getClientOriginalName() }}</span>
+                        </div>
+                        @endif
+                    @endif
+
+                    @error('factura_nueva')
+                        <div class="flex items-center gap-2 p-3 text-xs font-medium text-red-700 border border-red-200 rounded-lg bg-red-50">
+                            ⚠️ {{ $message }}
+                        </div>
+                    @enderror
+                </div>
+                @endif
+            </div>
+        </div>
+    </div>
+
+    {{-- ══ PARTIDAS ══════════════════════════════════════════════════════ --}}
+    <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-xl">
+        <div class="flex items-center justify-between px-5 py-3 border-b border-gray-100"
+             style="background: linear-gradient(90deg, #4A1660 0%, #6d28d9 100%);">
+            <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-white/70" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+                </svg>
+                <h3 class="text-xs font-bold tracking-widest text-white uppercase">Partidas</h3>
+            </div>
+            <span class="text-[10px] text-white/50 font-medium">Máx. 5 archivos por partida</span>
+        </div>
+
+        <div class="divide-y divide-gray-50">
+            @foreach ($items as $i => $row)
+            <div wire:key="item-{{ $i }}" class="p-5 space-y-4">
+
+                {{-- Número de partida --}}
+                <div class="flex items-center justify-between">
+                    <span class="inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white rounded-full"
+                          style="background: linear-gradient(135deg, #4A1660, #7c3aed);">
+                        {{ $i + 1 }}
+                    </span>
+                    @if(count($items) > 1)
+                    <button type="button" wire:click="removeItem({{ $i }})"
+                            class="inline-flex items-center gap-1 text-xs text-red-400 transition-colors hover:text-red-600">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                        </svg>
+                        Eliminar partida
+                    </button>
+                    @endif
+                </div>
+
+                {{-- Fila 1: Descripción + Cantidad + Unidad + Precio --}}
+                <div class="grid grid-cols-12 gap-3">
+                    <div class="col-span-12 sm:col-span-5">
+                        <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                            Descripción <span class="text-red-400">*</span>
+                        </label>
+                        <input type="text" wire:model.lazy="items.{{ $i }}.descripcion"
+                               placeholder="Producto o servicio"
+                               class="w-full rounded-lg border-gray-200 text-sm shadow-sm focus:ring-purple-500 focus:border-purple-500
+                                      @error("items.$i.descripcion") border-red-400 @enderror">
+                        @error("items.$i.descripcion") <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
+                    </div>
+
+                    <div class="col-span-4 sm:col-span-2">
+                        <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Cantidad</label>
+                        <input type="number" step="0.001" min="0"
+                               wire:model.debounce.400ms="items.{{ $i }}.cantidad"
+                               class="w-full text-sm text-right border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                    </div>
+
+                    <div class="col-span-8 sm:col-span-3">
+                        <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Unidad</label>
+                        <select wire:model="items.{{ $i }}.unidad_medida_id"
+                                class="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                            <option value="">— Unidad —</option>
+                            @foreach ($unidades_medida as $um)
+                                <option value="{{ $um['id'] }}">{{ $um['abreviatura'] }} — {{ $um['nombre'] }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div class="col-span-6 sm:col-span-2">
+                        <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Precio unit.</label>
+                        <div class="relative">
+                            <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-300 text-xs font-bold">$</span>
+                            <input type="number" step="0.01" min="0"
+                                   wire:model.debounce.400ms="items.{{ $i }}.precio_unitario"
+                                   class="w-full pl-6 text-sm text-right border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Fila 2: Impuesto + Proveedor + Link + Mini total --}}
+                <div class="grid grid-cols-12 gap-3">
+                    <div class="col-span-12 sm:col-span-3">
+                        <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Impuesto</label>
+                        <select wire:model="items.{{ $i }}.tipo_impuesto_id"
+                                class="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                            <option value="">Sin impuesto</option>
+                            @foreach ($tipos_impuesto as $ti)
+                                <option value="{{ $ti['id'] }}">{{ $ti['nombre'] }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div class="col-span-12 sm:col-span-4">
+                        <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Proveedor sugerido</label>
+                        <input type="text" wire:model.lazy="items.{{ $i }}.proveedor_sugerido"
+                               placeholder="Nombre del proveedor"
+                               class="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                    </div>
+
+                    <div class="col-span-12 sm:col-span-3">
+                        <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Link de referencia</label>
+                        <input type="url" wire:model.lazy="items.{{ $i }}.link_compra"
+                               placeholder="https://..."
+                               class="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                    </div>
+
+                    {{-- Mini totales --}}
+                    <div class="flex flex-col justify-end col-span-12 sm:col-span-2">
+                        <div class="px-3 py-2 space-y-1 text-xs border border-purple-100 rounded-xl bg-purple-50/50">
+                            <div class="flex justify-between text-gray-400">
+                                <span>Subtotal</span>
+                                <span>${{ number_format($row['subtotal'] ?? 0, 2) }}</span>
+                            </div>
+                            @if(($row['monto_impuesto'] ?? 0) > 0)
+                            <div class="flex justify-between text-gray-400">
+                                <span>Imp.</span>
+                                <span>${{ number_format($row['monto_impuesto'] ?? 0, 2) }}</span>
+                            </div>
                             @endif
-                        </td>
+                            <div class="flex justify-between pt-1 font-bold border-t border-purple-200" style="color: #4A1660">
+                                <span>Total</span>
+                                <span>${{ number_format($row['total_item'] ?? 0, 2) }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-                        <td class="px-3 py-2 text-right">
-                            <input type="number" step="0.01" min="0" class="text-right border-gray-300 rounded w-28"
-                                   wire:model.debounce.300ms="items.{{ $i }}.precio_unitario">
-                            @error("items.$i.precio_unitario") <p class="text-xs text-red-600">{{ $message }}</p> @enderror
-                        </td>
+                {{-- Archivos --}}
+                <div>
+                    <label class="block mb-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                        Archivos adjuntos
+                        <span class="font-normal text-gray-300 normal-case">(fichas técnicas, cotizaciones — máx. 5)</span>
+                    </label>
 
-                        <td class="px-3 py-2">
-                            <input type="url" class="w-full border-gray-300 rounded"
-                                   wire:model.lazy="items.{{ $i }}.link_compra"
-                                   placeholder="https://...">
-                            @error("items.$i.link_compra") <p class="text-xs text-red-600">{{ $message }}</p> @enderror
-                        </td>
+                    @if(!empty($row['archivos_existentes']))
+                    <div class="flex flex-wrap gap-2 mb-2">
+                        @foreach($row['archivos_existentes'] as $arch)
+                        <div class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-gray-200 bg-gray-50 text-xs">
+                            <span>{{ $arch['icono'] ?? '📎' }}</span>
+                            <a href="{{ $arch['url'] }}" target="_blank" class="text-indigo-500 hover:underline max-w-[140px] truncate">
+                                {{ $arch['nombre_original'] }}
+                            </a>
+                            <button type="button" wire:click="removeArchivoExistente({{ $i }}, {{ $arch['id'] }})"
+                                    class="ml-1 text-gray-300 transition-colors hover:text-red-500">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                            </button>
+                        </div>
+                        @endforeach
+                    </div>
+                    @endif
 
-                        <td class="px-3 py-2 text-right">
-                            ${{ number_format($row['subtotal'] ?? 0, 2) }}
-                        </td>
+                    @if(!empty($row['ficha_tecnica_path']) && empty($row['archivos_existentes']))
+                    <div class="mb-2">
+                        <a href="{{ Storage::disk('public')->url($row['ficha_tecnica_path']) }}" target="_blank"
+                           class="inline-flex items-center gap-1 text-xs text-indigo-500 hover:underline">
+                            📄 {{ $row['ficha_tecnica_nombre'] ?? 'Ficha técnica' }}
+                            <span class="text-gray-300">(anterior)</span>
+                        </a>
+                    </div>
+                    @endif
 
-                        <td class="px-3 py-2 text-right">
-                            <button type="button" class="text-red-600 hover:text-red-800"
-                                    wire:click="removeItem({{ $i }})">Eliminar</button>
-                        </td>
-                    </tr>
-                @endforeach
-            </tbody>
-        </table>
+                    @php $totalArch = count($row['archivos_existentes'] ?? []); @endphp
+                    @if($totalArch < 5)
+                    <label class="inline-flex items-center gap-2 px-3 py-2 text-xs text-gray-500 transition-colors border border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
+                        <svg class="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
+                        </svg>
+                        Adjuntar archivo
+                        <input type="file" multiple wire:model="archivos_nuevos.{{ $i }}"
+                               accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx" class="hidden">
+                    </label>
+                    <div wire:loading wire:target="archivos_nuevos.{{ $i }}" class="inline-flex items-center gap-1 ml-2 text-xs text-purple-500">
+                        <svg class="w-3 h-3 animate-spin" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                        Subiendo...
+                    </div>
+                    @else
+                    <p class="text-xs text-amber-500">⚠️ Límite de 5 archivos alcanzado</p>
+                    @endif
+                </div>
 
-        <div class="mt-3">
-            <button type="button" class="px-3 py-2 bg-gray-100 rounded hover:bg-gray-200"
-                    wire:click="addItem">+ Agregar partida</button>
+            </div>
+            @endforeach
+        </div>
+
+        <div class="px-5 py-3 border-t border-gray-100 bg-gray-50">
+            <button type="button" wire:click="addItem"
+                    class="inline-flex items-center gap-1.5 text-sm font-semibold transition-colors" style="color: #4A1660">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                </svg>
+                Agregar partida
+            </button>
         </div>
     </div>
 
-    <div class="grid justify-end gap-4 md:grid-cols-3">
-        <div class="p-4 border rounded md:col-start-2 bg-gray-50">
-            <div class="flex justify-between"><span>Subtotal</span><strong>${{ number_format($subtotal,2) }}</strong></div>
-            <div class="flex justify-between"><span>IVA (16%)</span><strong>${{ number_format($iva,2) }}</strong></div>
-            <div class="flex justify-between text-lg"><span>Total</span><strong>${{ number_format($total,2) }}</strong></div>
-        </div>
-
-        <div class="flex items-end gap-3">
-            <button type="button" wire:click.prevent="saveDraft"
-                    wire:loading.attr="disabled" wire:target="saveDraft"
-                    class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">
-                Guardar borrador
-            </button>
-
-            <button type="button" wire:click.prevent="sendToApproval"
-                    wire:loading.attr="disabled" wire:target="sendToApproval"
-                    class="px-4 py-2 text-white bg-indigo-600 rounded hover:bg-indigo-700">
-                <span wire:loading.remove wire:target="sendToApproval">Enviar a aprobación</span>
-                <span wire:loading wire:target="sendToApproval">Enviando…</span>
-            </button>
+    {{-- ══ TOTALES ════════════════════════════════════════════════════════ --}}
+    <div class="flex justify-end">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 w-full max-w-xs space-y-2.5">
+            <div class="flex justify-between text-sm text-gray-500">
+                <span>Subtotal</span>
+                <span class="font-semibold text-gray-700">${{ number_format($subtotal, 2) }}</span>
+            </div>
+            <div class="flex justify-between text-sm text-gray-500">
+                <span>Impuestos</span>
+                <span class="font-semibold text-gray-700">${{ number_format($total_impuestos, 2) }}</span>
+            </div>
+            <div class="flex justify-between pt-2.5 border-t border-gray-100">
+                <span class="font-bold text-gray-800">Total</span>
+                <span class="text-xl font-black" style="color: #4A1660">${{ number_format($total, 2) }}</span>
+            </div>
         </div>
     </div>
+
+    {{-- ══ ACCIONES ════════════════════════════════════════════════════════ --}}
+    <div class="flex items-center justify-end gap-3 pb-6">
+        <a href="{{ route('requisiciones.index') }}"
+           class="px-4 py-2.5 text-sm font-medium text-gray-500 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition">
+            Cancelar
+        </a>
+
+        @if($estado_actual === 'borrador')
+        <button type="button" wire:click.prevent="saveDraft"
+                wire:loading.attr="disabled" wire:target="saveDraft"
+                class="px-4 py-2.5 text-sm font-semibold text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition disabled:opacity-50">
+            <span wire:loading.remove wire:target="saveDraft">Guardar borrador</span>
+            <span wire:loading wire:target="saveDraft">Guardando…</span>
+        </button>
+        @endif
+
+        @if($estado_actual === 'borrador')
+        <button type="button" wire:click.prevent="sendToApproval"
+                wire:loading.attr="disabled" wire:target="sendToApproval"
+                class="px-6 py-2.5 text-sm font-bold text-white rounded-lg shadow-md hover:shadow-lg transition-all disabled:opacity-50"
+                style="background: linear-gradient(135deg, #4A1660, #7c3aed);">
+            <span wire:loading.remove wire:target="sendToApproval">Enviar a Compras</span>
+            <span wire:loading wire:target="sendToApproval" class="flex items-center gap-2">
+                <svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+                Enviando…
+            </span>
+        </button>
+        @endif
+
+        @if($estado_actual === 'rechazada_compras')
+        <button type="button" wire:click.prevent="reenviarACompras"
+                wire:loading.attr="disabled" wire:target="reenviarACompras"
+                class="px-6 py-2.5 text-sm font-bold text-white bg-orange-600 rounded-lg hover:bg-orange-700 shadow-md hover:shadow-lg transition-all disabled:opacity-50">
+            <span wire:loading.remove wire:target="reenviarACompras">↩️ Reenviar a Compras</span>
+            <span wire:loading wire:target="reenviarACompras">Reenviando…</span>
+        </button>
+        @endif
+    </div>
+
+</div>
 </div>

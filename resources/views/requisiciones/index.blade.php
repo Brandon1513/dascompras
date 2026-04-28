@@ -1,158 +1,301 @@
-{{-- resources/views/requisiciones/index.blade.php --}}
 <x-app-layout>
     <x-slot name="header">
         <div class="flex items-center justify-between">
-            <h2 class="text-xl font-semibold leading-tight">Requisiciones</h2>
-            <a href="{{ route('requisiciones.create') }}" class="px-4 py-2 text-white bg-indigo-600 rounded hover:bg-indigo-700">
-                Nueva requisición
-            </a>
+            <div>
+                <h2 class="text-lg font-bold text-gray-900">Requisiciones</h2>
+                <p class="text-xs text-gray-400 mt-0.5">Gestión y seguimiento de solicitudes de compra</p>
+            </div>
+            <div class="flex items-center gap-2">
+                @role('administrador|compras')
+                <a href="{{ route('requisiciones.exportar', request()->query()) }}"
+                   class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    Exportar Excel
+                </a>
+                @endrole
+                <a href="{{ route('requisiciones.create') }}"
+                   class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white rounded-lg shadow-md hover:shadow-lg transition-all"
+                   style="background: linear-gradient(135deg, #4A1660, #7c3aed);">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Nueva requisición
+                </a>
+            </div>
         </div>
     </x-slot>
 
-    <div class="py-6">
-        <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-            <div class="p-6 bg-white shadow sm:rounded-lg">
+    <div class="min-h-screen py-6" style="background: linear-gradient(160deg, #f8f5ff 0%, #f1f5f9 50%, #f8f5ff 100%);">
+        <div class="px-4 mx-auto space-y-4 max-w-7xl sm:px-6 lg:px-8">
 
-                {{-- Filtros --}}
-                <form method="GET" class="grid items-end gap-3 mb-4 md:grid-cols-4">
-                    <div>
-                        <label class="block text-sm font-medium">Estado</label>
-                        <select name="estado" class="w-full mt-1 border-gray-300 rounded">
-                            <option value="">Todos</option>
-                            @foreach (['borrador','enviada','en_aprobacion','rechazada','aprobada_final','recibida','cancelada'] as $opt)
-                                <option value="{{ $opt }}" @selected(($estado ?? '') === $opt)>{{ ucfirst(str_replace('_',' ', $opt)) }}</option>
-                            @endforeach
-                        </select>
-                    </div>
+            {{-- Flash --}}
+            @if (session('status'))
+                <div class="flex items-center gap-2 p-4 text-sm font-medium border shadow-sm text-emerald-800 border-emerald-200 rounded-xl bg-emerald-50">
+                    <svg class="w-4 h-4 shrink-0 text-emerald-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                    </svg>
+                    {{ session('status') }}
+                </div>
+            @endif
 
-                    @role('administrador|compras|gerente_area|gerencia_adm|direccion|jefe')
-                    <div>
-                        <label class="block text-sm font-medium">Solicitante</label>
-                        <select name="solicitante" class="w-full mt-1 border-gray-300 rounded">
-                            <option value="">Todos</option>
-                            @foreach ($solicitantes as $u)
-                                <option value="{{ $u->id }}" @selected(($solicitante ?? '') == $u->id)>{{ $u->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    @endrole
+            {{-- Filtros --}}
+            <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-xl">
+                <div class="flex items-center gap-2 px-5 py-3 border-b border-gray-100 bg-gray-50">
+                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
+                    </svg>
+                    <span class="text-xs font-bold tracking-wider text-gray-500 uppercase">Filtros</span>
+                </div>
+                <div class="p-4">
+                    <form method="GET" class="grid items-end grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-6">
 
-                    <div class="flex gap-2">
-                        <button class="px-4 py-2 mt-6 bg-gray-200 rounded hover:bg-gray-300">Aplicar</button>
-                        <a href="{{ route('requisiciones.index') }}" class="px-4 py-2 mt-6 bg-white border rounded hover:bg-gray-50">Limpiar</a>
-                    </div>
-                </form>
+                        <div class="col-span-2 md:col-span-1">
+                            <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Estado</label>
+                            <select name="estado"
+                                    class="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                                <option value="">Todos</option>
+                                @foreach([
+                                    'borrador'            => 'Borrador',
+                                    'en_revision_compras' => 'En revisión compras',
+                                    'rechazada_compras'   => 'Rechazada por compras',
+                                    'aprobada_compras'    => 'Aprobada por compras',
+                                    'en_aprobacion'       => 'En aprobación',
+                                    'rechazada'           => 'Rechazada',
+                                    'aprobada_final'      => 'Aprobada',
+                                    'pendiente_cierre'    => 'Pendiente de cierre',
+                                    'recibida'            => 'Recibida',
+                                    'cancelada'           => 'Cancelada',
+                                ] as $val => $label)
+                                    <option value="{{ $val }}" @selected(($estado ?? '') === $val)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
 
-                @if (session('status'))
-                    <div class="p-3 mb-4 text-green-800 bg-green-100 rounded">{{ session('status') }}</div>
-                @endif
+                        @role('administrador|compras|gerente_operaciones|gerencia_adm|jefe')
+                        <div class="col-span-2 md:col-span-1">
+                            <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Solicitante</label>
+                            <select name="solicitante"
+                                    class="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                                <option value="">Todos</option>
+                                @foreach ($solicitantes as $u)
+                                    <option value="{{ $u->id }}" @selected(($solicitante ?? '') == $u->id)>{{ $u->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        @endrole
 
+                        @role('administrador|compras')
+                        <div class="col-span-2 md:col-span-1">
+                            <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Método pago</label>
+                            <select name="metodo_pago"
+                                    class="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                                <option value="">Todos</option>
+                                <option value="tarjeta"       @selected(($metodo_pago ?? '') === 'tarjeta')>💳 Tarjeta</option>
+                                <option value="transferencia" @selected(($metodo_pago ?? '') === 'transferencia')>🏦 Transferencia</option>
+                            </select>
+                        </div>
+                        <div class="col-span-2 md:col-span-1">
+                            <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tipo</label>
+                            <select name="pago_factura"
+                                    class="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                                <option value="">Todos</option>
+                                <option value="0" @selected(($pago_factura ?? '') === '0')>Requisición</option>
+                                <option value="1" @selected(($pago_factura ?? '') === '1')>Pago de factura</option>
+                            </select>
+                        </div>
+                        @endrole
+
+                        <div class="flex items-end col-span-2 gap-2 md:col-span-1">
+                            <button class="flex-1 px-3 py-2 text-sm font-semibold text-white transition rounded-lg"
+                                    style="background: linear-gradient(135deg, #4A1660, #7c3aed);">
+                                Aplicar
+                            </button>
+                            <a href="{{ route('requisiciones.index') }}"
+                               class="flex-1 px-3 py-2 text-sm font-medium text-center text-gray-600 transition bg-gray-100 rounded-lg hover:bg-gray-200">
+                                Limpiar
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            {{-- Tabla --}}
+            <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-xl">
                 <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="text-xs tracking-wider text-gray-700 uppercase bg-gray-50">
-                            <tr>
-                                <th class="px-3 py-2 text-left">Folio</th>
-                                <th class="px-3 py-2 text-left">Fecha</th>
-                                <th class="px-3 py-2 text-left">Solicitante</th>
-                                <th class="px-3 py-2 text-left">Departamento</th>
-                                <th class="px-3 py-2 text-left">Estado</th>
-                                <th class="px-3 py-2 text-right">Total</th>
-                                <th class="px-3 py-2 text-right">Acciones</th>
+                    <table class="min-w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-gray-100" style="background: linear-gradient(90deg, #f9f5ff, #f8f8ff);">
+                                <th class="px-4 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">Folio</th>
+                                <th class="px-4 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">Fecha</th>
+                                <th class="px-4 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">Solicitante</th>
+                                <th class="px-4 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">Departamento</th>
+                                <th class="px-4 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">Estado</th>
+                                @role('administrador|compras')
+                                <th class="px-4 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">Pago</th>
+                                @endrole
+                                <th class="px-4 py-3.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total</th>
+                                <th class="px-4 py-3.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-wider">Acciones</th>
                             </tr>
                         </thead>
-
-                        <tbody class="divide-y divide-gray-100">
-                            @foreach ($requisiciones as $r)
+                        <tbody class="divide-y divide-gray-50">
+                            @forelse ($requisiciones as $r)
                                 @php
-                                    $chip = match($r->estado) {
-                                        'borrador'        => 'border-gray-300 text-gray-700',
-                                        'enviada'         => 'border-sky-300 text-sky-700',
-                                        'en_aprobacion'   => 'border-amber-300 text-amber-700',
-                                        'rechazada'       => 'border-rose-300 text-rose-700',
-                                        'aprobada_final'  => 'border-emerald-300 text-emerald-700',
-                                        'recibida'        => 'border-indigo-300 text-indigo-700',
-                                        'cancelada'       => 'border-gray-300 text-gray-500',
-                                        default           => 'border-gray-300 text-gray-700',
+                                    $color  = $r->estadoColor;
+                                    $canPdf = in_array($r->estado, ['aprobada_final', 'pendiente_cierre', 'recibida'], true);
+                                    // Borde izquierdo según estado
+                                    $borderColor = match($r->estado) {
+                                        'en_revision_compras' => '#7c3aed',
+                                        'rechazada_compras'   => '#f97316',
+                                        'en_aprobacion'       => '#f59e0b',
+                                        'aprobada_final'      => '#10b981',
+                                        'pendiente_cierre'    => '#06b6d4',
+                                        'recibida'            => '#6366f1',
+                                        'rechazada'           => '#ef4444',
+                                        default               => 'transparent',
                                     };
-
-                                    // ✅ PDF solo si está aprobada final o recibida
-                                    $canPdf = in_array($r->estado, ['aprobada_final','recibida'], true);
                                 @endphp
+                                <tr class="transition-colors hover:bg-purple-50/20 group"
+                                    style="border-left: 3px solid {{ $borderColor }};">
 
-                                <tr>
-                                    <td class="px-3 py-2">
-                                        <a href="{{ route('requisiciones.show', $r) }}" class="hover:underline">
-                                            {{ $r->folio }}
-                                        </a>
+                                    {{-- Folio --}}
+                                    <td class="px-4 py-3.5">
+                                        <div class="flex items-center gap-1.5">
+                                            <a href="{{ route('requisiciones.show', $r) }}"
+                                               class="text-sm font-bold text-indigo-600 hover:text-indigo-800 hover:underline">
+                                                {{ $r->folio }}
+                                            </a>
+                                            @if($r->es_pago_factura)
+                                                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-violet-100 text-violet-700">FAC</span>
+                                            @endif
+                                            @if($r->urgencia === 'urgente')
+                                                <span class="text-xs" title="Urgente">🔴</span>
+                                            @endif
+                                        </div>
                                     </td>
 
-                                    <td class="px-3 py-2">
-                                        {{ \Illuminate\Support\Carbon::parse($r->fecha_emision)->format('Y-m-d') }}
+                                    <td class="px-4 py-3.5 text-xs text-gray-500">
+                                        {{ \Carbon\Carbon::parse($r->fecha_emision)->format('d/m/Y') }}
                                     </td>
 
-                                    <td class="px-3 py-2">{{ $r->solicitante?->name }}</td>
+                                    <td class="px-4 py-3.5 text-sm text-gray-700 font-medium">{{ $r->solicitante?->name ?? '—' }}</td>
 
-                                    <td class="px-3 py-2">{{ $r->departamentoRef?->nombre ?? '—' }}</td>
+                                    <td class="px-4 py-3.5 text-xs text-gray-500">{{ $r->departamentoRef?->nombre ?? '—' }}</td>
 
-                                    <td class="px-3 py-2">
-                                        <span class="px-2 py-0.5 rounded text-xs border {{ $chip }}">
-                                            {{ str_replace('_',' ', $r->estado) }}
+                                    {{-- Estado --}}
+                                    <td class="px-4 py-3.5">
+                                        <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold border
+                                                     {{ $color['bg'] }} {{ $color['text'] }} {{ $color['border'] }}">
+                                            {{ $r->estado_label }}
                                         </span>
                                     </td>
 
-                                    <td class="px-3 py-2 text-right">${{ number_format($r->total,2) }}</td>
+                                    {{-- Método de pago --}}
+                                    @role('administrador|compras')
+                                    <td class="px-4 py-3.5">
+                                        @if($r->metodo_pago)
+                                            <span @class([
+                                                'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold',
+                                                'bg-blue-50 text-blue-700'   => $r->metodo_pago === 'transferencia',
+                                                'bg-purple-50 text-purple-700' => $r->metodo_pago === 'tarjeta',
+                                            ])>
+                                                {{ $r->metodo_pago === 'tarjeta' ? '💳' : '🏦' }}
+                                                {{ ucfirst($r->metodo_pago) }}
+                                            </span>
+                                        @else
+                                            <span class="text-xs text-gray-300">—</span>
+                                        @endif
+                                    </td>
+                                    @endrole
 
-                                    <td class="px-3 py-2 text-right">
-                                        @can('approve', $r)
-                                            <a href="{{ route('requisiciones.show', $r) }}" class="text-indigo-600 hover:underline">
-                                                Revisar / Aprobar
-                                            </a>
+                                    <td class="px-4 py-3.5 text-right font-bold text-gray-800">
+                                        ${{ number_format($r->total, 2) }}
+                                    </td>
 
-                                        @elsecan('update', $r)
-                                            <a href="{{ route('requisiciones.edit', $r) }}" class="text-indigo-600 hover:underline">
-                                                Continuar edición
-                                            </a>
+                                    {{-- Acciones --}}
+                                    <td class="px-4 py-3.5 text-right">
+                                        <div class="inline-flex items-center gap-1.5 text-xs">
 
-                                        @elsecan('receive', $r)
-                                            <a href="{{ route('requisiciones.recibir', $r) }}" class="text-indigo-600 hover:underline">
-                                                Registrar recepción
-                                            </a>
-
-                                            @if($canPdf)
-                                                <span class="mx-1">|</span>
-                                                <a href="{{ route('requisiciones.pdf', $r) }}" target="_blank"
-                                                   class="text-purple-700 hover:underline" title="Descargar PDF">
-                                                    PDF
+                                            @role('administrador|compras')
+                                            @if($r->estado === 'en_revision_compras')
+                                                <a href="{{ route('requisiciones.revisar', $r) }}"
+                                                   class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md font-semibold text-violet-700 bg-violet-100 hover:bg-violet-200 transition">
+                                                    🔍 Revisar
                                                 </a>
                                             @endif
+                                            @if($r->estado === 'pendiente_cierre')
+                                                <a href="{{ route('requisiciones.cerrar', $r) }}"
+                                                   class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md font-semibold text-cyan-700 bg-cyan-100 hover:bg-cyan-200 transition">
+                                                    ✅ Cerrar
+                                                </a>
+                                            @endif
+                                            @endrole
 
-                                        @elsecan('view', $r)
-                                            <a href="{{ route('requisiciones.show', $r) }}" class="text-gray-600 hover:underline">
+                                            @can('update', $r)
+                                                <a href="{{ route('requisiciones.edit', $r) }}"
+                                                   class="px-2.5 py-1 rounded-md font-semibold transition
+                                                          {{ $r->estado === 'rechazada_compras'
+                                                             ? 'text-orange-700 bg-orange-100 hover:bg-orange-200'
+                                                             : 'text-indigo-700 bg-indigo-50 hover:bg-indigo-100' }}">
+                                                    {{ $r->estado === 'rechazada_compras' ? '↩️ Corregir' : '✏️ Editar' }}
+                                                </a>
+                                            @endcan
+
+                                            @can('approve', $r)
+                                                <a href="{{ route('requisiciones.show', $r) }}"
+                                                   class="px-2.5 py-1 rounded-md font-semibold text-amber-700 bg-amber-100 hover:bg-amber-200 transition">
+                                                    ✍️ Aprobar
+                                                </a>
+                                            @endcan
+
+                                            @can('receive', $r)
+                                                <a href="{{ route('requisiciones.recibir', $r) }}"
+                                                   class="px-2.5 py-1 rounded-md font-semibold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 transition">
+                                                    📦 Recibir
+                                                </a>
+                                            @endcan
+
+                                            <a href="{{ route('requisiciones.show', $r) }}"
+                                               class="px-2.5 py-1 rounded-md font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition">
                                                 Ver
                                             </a>
 
                                             @if($canPdf)
-                                                <span class="mx-1">|</span>
                                                 <a href="{{ route('requisiciones.pdf', $r) }}" target="_blank"
-                                                   class="text-purple-700 hover:underline" title="Descargar PDF">
+                                                   class="px-2.5 py-1 rounded-md font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 transition">
                                                     PDF
                                                 </a>
                                             @endif
-
-                                        @else
-                                            <span class="text-gray-400">—</span>
-                                        @endcan
+                                        </div>
                                     </td>
                                 </tr>
-                            @endforeach
+                            @empty
+                                <tr>
+                                    <td colspan="8" class="px-4 py-16 text-center">
+                                        <div class="flex flex-col items-center gap-3">
+                                            <div class="flex items-center justify-center w-16 h-16 rounded-2xl" style="background: linear-gradient(135deg, #f3e8ff, #ede9fe);">
+                                                <svg class="w-8 h-8 text-purple-300" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                                                </svg>
+                                            </div>
+                                            <p class="text-sm font-medium text-gray-400">No hay requisiciones que mostrar</p>
+                                            <p class="text-xs text-gray-300">Intenta cambiar los filtros o crea una nueva</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            @endforelse
                         </tbody>
                     </table>
                 </div>
 
-                <div class="mt-4">
+                @if($requisiciones->hasPages())
+                <div class="px-4 py-3 border-t border-gray-100 bg-gray-50">
                     {{ $requisiciones->links() }}
                 </div>
+                @endif
             </div>
+
         </div>
     </div>
 </x-app-layout>

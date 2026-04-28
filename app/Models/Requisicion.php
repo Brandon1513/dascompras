@@ -11,134 +11,286 @@ class Requisicion extends Model
     protected $table = 'requisiciones';
 
     protected $fillable = [
-        'folio','fecha_emision','solicitante_id',
-        'departamento_id','centro_costo_id',
-        'departamento','centro_costo',
-        'justificacion','subtotal','iva','total','fecha_requerida','urgencia',
-        'estado','recibido_por_id','fecha_recibido','area_recibe', 'recibe_nombre', 'firma_recepcion_path',
-        // 'aplica_iva' // <- solo si existe en tu tabla
+        'folio',
+        'fecha_emision',
+        'solicitante_id',
+        'departamento_id',
+        'centro_costo_id',
+        'departamento',
+        'centro_costo',
+        'justificacion',
+        'subtotal',
+        'iva',
+        'total',
+        'fecha_requerida',
+        'urgencia',
+        'estado',
+        // Recepción
+        'recibido_por_id',
+        'fecha_recibido',
+        'area_recibe',
+        'recibe_nombre',
+        'firma_recepcion_path',
+        // Campos de compras
+        'es_pago_factura',
+        'factura_path',
+        'factura_nombre',
+        'tiene_factura',
+        'uuid_factura',
+        'factura_compras_path',
+        'factura_compras_nombre',
+        'cerrado_por_id',
+        'cerrado_en',
+        'notas_cierre',
+
+
+        'metodo_pago',
+        'observaciones_compras',
+        // Campos de revisión (nuevo flujo)
+        'motivo_rechazo_compras',
+        'revisado_por_id',
+        'revisado_en',
+
+        //factura
+
     ];
 
     protected $casts = [
-        'fecha_emision' => 'date',
+        'fecha_emision'   => 'date',
         'fecha_requerida' => 'date',
-        'fecha_recibido' => 'datetime',
-        // 'aplica_iva' => 'boolean', // <- solo si existe en tu tabla
+        'fecha_recibido'  => 'datetime',
+        'revisado_en'     => 'datetime',
+        'es_pago_factura' => 'boolean',
+        'subtotal'        => 'decimal:2',
+        'iva'             => 'decimal:2',
+        'total'           => 'decimal:2',
+        'tiene_factura' => 'boolean',
+         'cerrado_en'    => 'datetime',
+
     ];
 
-    // ✅ Nombres estándar (para tu Blade)
+    // ─── Constantes de estado ─────────────────────────────────────────────
+
+    const ESTADOS_LABEL = [
+        'borrador'              => 'Borrador',
+        'enviada'               => 'Enviada',
+        'en_revision_compras'   => 'En revisión de compras',
+        'rechazada_compras'     => 'Rechazada por compras',
+        'aprobada_compras'      => 'Aprobada por compras',
+        'en_aprobacion'         => 'En aprobación',
+        'rechazada'             => 'Rechazada',
+        'aprobada_final'        => 'Aprobada',
+        'cancelada'             => 'Cancelada',
+        'recibida'              => 'Recibida',
+        'pendiente_cierre'      => 'Pendiente de cierre',
+    ];
+
+    const ESTADOS_COLOR = [
+        'borrador'              => ['bg' => 'bg-gray-100',    'text' => 'text-gray-600',    'border' => 'border-gray-200'],
+        'enviada'               => ['bg' => 'bg-sky-50',      'text' => 'text-sky-700',      'border' => 'border-sky-200'],
+        'en_revision_compras'   => ['bg' => 'bg-violet-50',   'text' => 'text-violet-700',   'border' => 'border-violet-200'],
+        'rechazada_compras'     => ['bg' => 'bg-orange-50',   'text' => 'text-orange-700',   'border' => 'border-orange-200'],
+        'aprobada_compras'      => ['bg' => 'bg-cyan-50',     'text' => 'text-cyan-700',     'border' => 'border-cyan-200'],
+        'en_aprobacion'         => ['bg' => 'bg-amber-50',    'text' => 'text-amber-700',    'border' => 'border-amber-200'],
+        'rechazada'             => ['bg' => 'bg-rose-50',     'text' => 'text-rose-700',     'border' => 'border-rose-200'],
+        'aprobada_final'        => ['bg' => 'bg-emerald-50',  'text' => 'text-emerald-700',  'border' => 'border-emerald-200'],
+        'cancelada'             => ['bg' => 'bg-gray-100',    'text' => 'text-gray-400',     'border' => 'border-gray-200'],
+        'recibida'              => ['bg' => 'bg-teal-50',     'text' => 'text-teal-700',     'border' => 'border-teal-200'],
+        'pendiente_cierre'      => ['bg' => 'bg-cyan-50',     'text' => 'text-cyan-700',     'border' => 'border-cyan-200'],
+    ];
+
+    const METODOS_PAGO_LABEL = [
+        'tarjeta'       => 'Tarjeta',
+        'transferencia' => 'Transferencia',
+    ];
+
+    // ─── Relaciones ───────────────────────────────────────────────────────
+
     public function departamento(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\Departamento::class, 'departamento_id');
+        return $this->belongsTo(Departamento::class, 'departamento_id');
     }
 
     public function centroCosto(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\Departamento::class, 'centro_costo_id');
+        return $this->belongsTo(Departamento::class, 'centro_costo_id');
     }
 
-    // 🔁 Alias (compatibilidad)
+    // Aliases de compatibilidad (usados en vistas y lógica de aprobación)
     public function departamentoRef(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\Departamento::class, 'departamento_id');
+        return $this->belongsTo(Departamento::class, 'departamento_id');
     }
 
     public function centroCostoRef(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\Departamento::class, 'centro_costo_id');
+        return $this->belongsTo(Departamento::class, 'centro_costo_id');
     }
 
     public function solicitante(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\User::class, 'solicitante_id');
+        return $this->belongsTo(User::class, 'solicitante_id');
     }
 
     public function recibidoPor(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\User::class, 'recibido_por_id');
+        return $this->belongsTo(User::class, 'recibido_por_id');
     }
+
+    public function revisadoPor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'revisado_por_id');
+    }
+    public function cerradoPor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'cerrado_por_id');
+    }
+
 
     public function items(): HasMany
     {
-        return $this->hasMany(\App\Models\RequisicionItem::class);
+        return $this->hasMany(RequisicionItem::class);
     }
 
     public function aprobaciones(): HasMany
     {
-        return $this->hasMany(\App\Models\Aprobacion::class);
+        return $this->hasMany(Aprobacion::class);
     }
 
+    // ─── Lógica de aprobaciones ───────────────────────────────────────────
+
     public function aprobacionPendiente(): ?\App\Models\Aprobacion
-{
-    if ($this->relationLoaded('aprobaciones')) {
-        return $this->aprobaciones
-            ->where('estado','pendiente')
-            ->sortBy(fn($a) => $a->nivel?->orden ?? 999)
+    {
+        if ($this->relationLoaded('aprobaciones')) {
+            return $this->aprobaciones
+                ->where('estado', 'pendiente')
+                ->sortBy(fn($a) => $a->nivel?->orden ?? 999)
+                ->first();
+        }
+
+        return $this->aprobaciones()
+            ->where('estado', 'pendiente')
+            ->orderBy('created_at')
             ->first();
     }
 
-    return $this->aprobaciones()
-        ->where('estado','pendiente')
-        ->orderBy('created_at')
-        ->first();
-}
-
-
     public function aprobacionPendientePara(\App\Models\User $user): ?\App\Models\Aprobacion
-{
-    $ap = $this->aprobacionPendiente();
-    if (!$ap) return null;
+    {
+        $ap = $this->aprobacionPendiente();
+        if (!$ap) return null;
 
-    // 1) Si la aprobación es para una persona específica (aprobador_id), solo esa persona puede firmar
-    if (!is_null($ap->aprobador_id)) {
-        return ((int)$ap->aprobador_id === (int)$user->id) ? $ap : null;
+        if (!is_null($ap->aprobador_id)) {
+            return ((int) $ap->aprobador_id === (int) $user->id) ? $ap : null;
+        }
+
+        $rol = $ap->nivel?->rol_aprobador;
+        if (!$rol) return null;
+
+        // Gerente de operaciones firma según asignación del departamento
+        if ($rol === 'gerente_operaciones') {
+            $gerenteId = $this->departamentoRef()->value('gerente_id');
+            if ((int) $gerenteId !== (int) $user->id) return null;
+            return $user->hasRole('gerente_operaciones') ? $ap : null;
+        }
+
+        return $user->hasRole($rol) ? $ap : null;
     }
 
-    // 2) Si NO hay aprobador_id, se firma por rol (ej. gerencia_adm)
-    $rol = $ap->nivel?->rol_aprobador;
-    if (!$rol) return null;
+    // ─── Scopes ───────────────────────────────────────────────────────────
 
-    // ✅ Caso especial: gerente_area (si algún día lo dejas null por rol)
-    // Solo puede firmar si el usuario es el gerente asignado del departamento de la requisición
-    if ($rol === 'gerente_area') {
-        $gerenteId = $this->departamentoRef()->value('gerente_id'); // o $this->departamento()->value('gerente_id')
-        if ((int)$gerenteId !== (int)$user->id) return null;
-
-        return $user->hasRole('gerente_area') ? $ap : null;
-    }
-
-    // ✅ Caso típico: gerencia_adm firma por rol
-    return $user->hasRole($rol) ? $ap : null;
-}
-
-
-    // ✅ ESTE ES EL QUE TE ESTÁ FALTANDO (o se perdió)
     public function scopeVisibleTo($query, \App\Models\User $user)
-{
-    // Roles con visibilidad total (ajusta a tus necesidades)
-    if ($user->hasAnyRole(['administrador','compras','gerencia_adm'])) {
-        return $query;
+    {
+        // Compras y admin ven todo
+        if ($user->hasAnyRole(['administrador', 'compras', 'gerencia_adm'])) {
+            return $query;
+        }
+
+        // Gerente de operaciones: sus requisiciones + las de su área
+        if ($user->hasRole('gerente_operaciones')) {
+            return $query->where(function ($q) use ($user) {
+                $q->where('solicitante_id', $user->id)
+                  ->orWhereHas('solicitante', fn($u) => $u->where('supervisor_id', $user->id))
+                  ->orWhereHas('departamentoRef', fn($d) => $d->where('gerente_id', $user->id));
+            });
+        }
+
+        // Jefe: sus requisiciones + las de sus subordinados
+        if ($user->hasRole('jefe')) {
+            return $query->where(function ($q) use ($user) {
+                $q->where('solicitante_id', $user->id)
+                  ->orWhereHas('solicitante', fn($u) => $u->where('supervisor_id', $user->id));
+            });
+        }
+
+        // Empleado: solo las propias
+        return $query->where('solicitante_id', $user->id);
     }
 
-    // Gerente de área: ve lo suyo + lo de su área
-    if ($user->hasRole('gerente_area')) {
-        return $query->where(function ($q) use ($user) {
-            $q->where('solicitante_id', $user->id)
-              ->orWhereHas('solicitante', fn($u) => $u->where('supervisor_id', $user->id))
-              ->orWhereHas('departamentoRef', fn($d) => $d->where('gerente_id', $user->id));
-        });
+    public function scopePorMetodoPago($query, string $metodo)
+    {
+        return $query->where('metodo_pago', $metodo);
     }
 
-    // Jefe directo: ve lo suyo y sus subordinados
-    if ($user->hasRole('jefe')) {
-        return $query->where(function($q) use ($user) {
-            $q->where('solicitante_id', $user->id)
-              ->orWhereHas('solicitante', fn($u) => $u->where('supervisor_id', $user->id));
-        });
+    public function scopePagoFactura($query, bool $solo = true)
+    {
+        return $query->where('es_pago_factura', $solo);
     }
 
-    // Usuario normal: solo lo suyo
-    return $query->where('solicitante_id', $user->id);
-}
+    // ─── Accessors ────────────────────────────────────────────────────────
 
+    public function getEstadoLabelAttribute(): string
+    {
+        return self::ESTADOS_LABEL[$this->estado] ?? $this->estado;
+    }
+
+    public function getEstadoColorAttribute(): array
+    {
+        return self::ESTADOS_COLOR[$this->estado] ?? self::ESTADOS_COLOR['borrador'];
+    }
+
+    public function getEstadoBgAttribute(): string
+    {
+        return $this->estadoColor['bg'] ?? 'bg-gray-100';
+    }
+
+    public function getEstadoTextAttribute(): string
+    {
+        return $this->estadoColor['text'] ?? 'text-gray-600';
+    }
+
+    public function getEstadoBorderAttribute(): string
+    {
+        return $this->estadoColor['border'] ?? 'border-gray-200';
+    }
+
+    public function getMetodoPagoLabelAttribute(): string
+    {
+        return self::METODOS_PAGO_LABEL[$this->metodo_pago] ?? '—';
+    }
+
+    // ─── Helpers de estado ────────────────────────────────────────────────
+
+    public function esBorrador(): bool              { return $this->estado === 'borrador'; }
+    public function estaEnRevisionCompras(): bool   { return $this->estado === 'en_revision_compras'; }
+    public function estaRechazadaPorCompras(): bool { return $this->estado === 'rechazada_compras'; }
+    public function estaAprobadaPorCompras(): bool  { return $this->estado === 'aprobada_compras'; }
+    public function estaEnAprobacion(): bool        { return $this->estado === 'en_aprobacion'; }
+    public function estaAprobada(): bool            { return $this->estado === 'aprobada_final'; }
+    public function estaRecibida(): bool            { return $this->estado === 'recibida'; }
+    public function estaRechazada(): bool           { return $this->estado === 'rechazada'; }
+
+    public function estaPendienteCierre(): bool { return $this->estado === 'pendiente_cierre'; }
+
+    // El usuario puede editar solo en borrador o rechazada por compras
+    public function puedeEditarSolicitante(\App\Models\User $user): bool
+    {
+        if ($user->id !== $this->solicitante_id) return false;
+        return in_array($this->estado, ['borrador', 'rechazada_compras']);
+    }
+
+    // Compras puede editar hasta que llegue a aprobación final
+    public function puedeEditarCompras(): bool
+    {
+        return !in_array($this->estado, ['aprobada_final', 'recibida', 'cancelada']);
+    }
 }

@@ -7,6 +7,12 @@ use App\Http\Controllers\EmpleadoController;
 use App\Http\Controllers\RequisicionController;
 use App\Http\Controllers\ExpedienteWebController;
 use App\Http\Controllers\DepartamentoGerenteController;
+use App\Http\Controllers\UnidadMedidaController;
+use App\Http\Controllers\TipoImpuestoController;
+use App\Livewire\Requisiciones\CerrarRequisicion;
+use App\Http\Controllers\RequisicionExportController;
+
+use App\Livewire\Requisiciones\RevisarRequisicion;
 Route::get('/', function () {
     return view('welcome');
 });
@@ -75,18 +81,77 @@ Route::middleware(['auth','active','role:administrador|compras'])->group(functio
 
 // routes/web.php
 Route::middleware(['auth'])->group(function () {
-    Route::get('/requisiciones', [RequisicionController::class, 'index'])->name('requisiciones.index');
-    Route::get('/requisiciones/crear', [RequisicionController::class, 'create'])->name('requisiciones.create');
-    Route::get('/requisiciones/{requisicion}/editar', [RequisicionController::class, 'edit'])->name('requisiciones.edit');
-
-    // PDF ANTES o DESPUÉS de show no afecta (no colisiona con /{requisicion})
-    Route::get('/requisiciones/{requisicion}/pdf', [RequisicionController::class, 'pdf'])
-        ->name('requisiciones.pdf')->whereNumber('requisicion');
-
-    Route::get('/requisiciones/{requisicion}', [RequisicionController::class,'show'])->name('requisiciones.show');
-    Route::get('/requisiciones/{requisicion}/recibir', Recibir::class)->name('requisiciones.recibir');
+ 
+    // ── Estáticas PRIMERO (sin parámetros) ────────────────────
+    Route::get('/requisiciones',
+        [RequisicionController::class, 'index']
+    )->name('requisiciones.index');
+ 
+    Route::get('/requisiciones/crear',
+        [RequisicionController::class, 'create']
+    )->name('requisiciones.create');
+ 
+    // Exportar Excel — DEBE ir antes de /{requisicion} para no colisionar
+    Route::get('/requisiciones/exportar',
+        [RequisicionExportController::class, 'export']
+    )->name('requisiciones.exportar')
+     ->middleware('role:compras|administrador');
+ 
+    // ── Con parámetro numérico fijo ───────────────────────────
+    Route::get('/requisiciones/{requisicion}/editar',
+        [RequisicionController::class, 'edit']
+    )->name('requisiciones.edit');
+ 
+    Route::get('/requisiciones/{requisicion}/pdf',
+        [RequisicionController::class, 'pdf']
+    )->name('requisiciones.pdf')
+     ->whereNumber('requisicion');
+ 
+    Route::get('/requisiciones/{requisicion}/recibir',
+        Recibir::class
+    )->name('requisiciones.recibir');
+ 
+    Route::get('/requisiciones/{requisicion}/revisar',
+        RevisarRequisicion::class
+    )->name('requisiciones.revisar')
+     ->middleware('role:compras|administrador');
+ 
+    Route::get('/requisiciones/{requisicion}/cerrar',
+        CerrarRequisicion::class
+    )->name('requisiciones.cerrar')
+     ->middleware('role:compras|administrador');
+ 
+    // ── Ruta dinámica SIEMPRE AL FINAL ───────────────────────
+    Route::get('/requisiciones/{requisicion}',
+        [RequisicionController::class, 'show']
+    )->name('requisiciones.show');
+ 
 });
 
+
+
+Route::middleware(['auth', 'role:administrador|compras'])->prefix('catalogos')->name('catalogos.')->group(function () {
+ 
+    // Unidades de Medida
+    Route::get('/unidades',                      [UnidadMedidaController::class, 'index'])  ->name('unidades.index');
+    Route::get('/unidades/create',               [UnidadMedidaController::class, 'create']) ->name('unidades.create');
+    Route::post('/unidades',                     [UnidadMedidaController::class, 'store'])  ->name('unidades.store');
+    Route::get('/unidades/{unidad}/edit',        [UnidadMedidaController::class, 'edit'])   ->name('unidades.edit');
+    Route::put('/unidades/{unidad}',             [UnidadMedidaController::class, 'update']) ->name('unidades.update');
+    Route::patch('/unidades/{unidad}/toggle',    [UnidadMedidaController::class, 'toggle']) ->name('unidades.toggle');
+ 
+    // Tipos de Impuesto
+    Route::get('/impuestos',                     [TipoImpuestoController::class, 'index'])  ->name('impuestos.index');
+    Route::get('/impuestos/create',              [TipoImpuestoController::class, 'create']) ->name('impuestos.create');
+    Route::post('/impuestos',                    [TipoImpuestoController::class, 'store'])  ->name('impuestos.store');
+    Route::get('/impuestos/{impuesto}/edit',     [TipoImpuestoController::class, 'edit'])   ->name('impuestos.edit');
+    Route::put('/impuestos/{impuesto}',          [TipoImpuestoController::class, 'update']) ->name('impuestos.update');
+    Route::patch('/impuestos/{impuesto}/toggle', [TipoImpuestoController::class, 'toggle']) ->name('impuestos.toggle');
+ 
+});
+
+
+ 
 
 
 

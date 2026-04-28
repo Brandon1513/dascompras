@@ -3,15 +3,16 @@
 namespace App\Livewire\Requisiciones;
 
 use App\Models\User;
+use App\Models\TipoImpuesto;
+use App\Models\UnidadMedida;
+use App\Models\RequisicionItemArchivo;
+use App\Notifications\RequisicionEnRevisionCompras;
 use Livewire\Component;
-use App\Models\Aprobacion;
 use App\Models\Requisicion;
 use App\Models\Departamento;
 use Illuminate\Support\Carbon;
-use App\Models\NivelAprobacion;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
-use App\Services\FlujoAprobacionService;
 use Illuminate\Validation\ValidationException;
 use Livewire\WithFileUploads;
 use Illuminate\Support\Facades\Storage;
@@ -21,46 +22,36 @@ class RequisicionForm extends Component
     use WithFileUploads;
 
     // --- Cabecera ---
-    public ?int $requisicionId = null;   // id al editar
-    public bool $isEditing = false;
+    public ?int $requisicionId   = null;
+    public bool $isEditing       = false;
 
     public string $fecha_emision;
-    public string $urgencia = 'normal';
-    public ?int $departamento_id = null;
-    public ?int $centro_costo_id = null;
-    public string $justificacion = '';
-    public string $solicitante_nombre = ''; // solo UI
+    public string $urgencia           = 'normal';
+    public ?int   $departamento_id    = null;
+    public ?int   $centro_costo_id    = null;
+    public string $justificacion      = '';
+    public string $solicitante_nombre = '';
+    public bool   $es_pago_factura    = false;
+    public string $estado_actual      = 'borrador';
+
+    // Factura adjunta (solo cuando es_pago_factura = true)
+    public mixed  $factura_nueva      = null;  // TemporaryUploadedFile
+    public ?string $factura_path      = null;  // Path guardado en BD
+    public ?string $factura_nombre    = null;  // Nombre original
 
     // --- Partidas ---
-    /**
-     * @var array<int, array{
-     *   descripcion:string,
-     *   unidad:?string,
-     *   cantidad:float,
-     *   precio_unitario:float,
-     *   subtotal:float,
-     *   link_compra:?string,
-     *   proveedor_sugerido:?string,
-     *   ficha_tecnica_path:?string,
-     *   ficha_tecnica_nombre:?string
-     * }>
-     */
-    public array $items = [];
+    public array $items           = [];
+    public array $archivos_nuevos = [];
 
-    /**
-     * Archivos por partida (NO dentro de items, porque Livewire maneja mejor arrays separados)
-     * @var array<int, mixed> TemporaryUploadedFile|null
-     */
-    public array $fichas_tecnicas = [];
+    // Totales
+    public float $subtotal        = 0;
+    public float $total_impuestos = 0;
+    public float $total           = 0;
 
-    public float $subtotal = 0;
-    public float $iva = 0;
-    public float $total = 0;
-
-    public const IVA_RATE = 0.16;
-
-    // Para selects
-    public array $departamentos = [];
+    // Catálogos
+    public array $departamentos   = [];
+    public array $unidades_medida = [];
+    public array $tipos_impuesto  = [];
 
     public function mount(?int $requisicionId = null): void
     {
@@ -68,65 +59,108 @@ class RequisicionForm extends Component
         $this->solicitante_nombre = Auth::user()?->name ?? '';
 
         $this->departamentos = Departamento::orderBy('nombre')
-            ->get(['id','nombre'])
-            ->map(fn ($d) => ['id' => $d->id, 'nombre' => $d->nombre])
+            ->get(['id', 'nombre'])
+            ->map(fn($d) => ['id' => $d->id, 'nombre' => $d->nombre])
             ->toArray();
+
+        $this->unidades_medida = UnidadMedida::activas()
+            ->get(['id', 'nombre', 'abreviatura'])
+            ->map(fn($u) => ['id' => $u->id, 'nombre' => $u->nombre, 'abreviatura' => $u->abreviatura])
+            ->toArray();
+
+        $this->tipos_impuesto = TipoImpuesto::activos()
+            ->get(['id', 'nombre', 'clave', 'porcentaje'])
+            ->map(fn($t) => [
+                'id'         => $t->id,
+                'nombre'     => $t->nombre,
+                'clave'      => $t->clave,
+                'porcentaje' => (float) $t->porcentaje,
+            ])->toArray();
 
         if ($requisicionId) {
             $this->isEditing     = true;
             $this->requisicionId = $requisicionId;
 
-            $req = Requisicion::with('items')->findOrFail($requisicionId);
+            $req = Requisicion::with(['items.archivos', 'items.unidadMedida', 'items.tipoImpuesto'])
+                ->findOrFail($requisicionId);
 
-            // Seguridad: solo dueño y en borrador
-            abort_unless($req->solicitante_id === Auth::id() && $req->estado === 'borrador', 403);
+            $esCompras     = Auth::user()->hasAnyRole(['compras', 'administrador']);
+            $esSolicitante = $req->solicitante_id === Auth::id();
 
-            // Prellenar cabecera
+            abort_unless(
+                ($esSolicitante && in_array($req->estado, ['borrador', 'rechazada_compras'])) ||
+                ($esCompras && $req->puedeEditarCompras()),
+                403
+            );
+
+            $this->estado_actual   = $req->estado;
             $this->fecha_emision   = $req->fecha_emision->toDateString();
             $this->urgencia        = $req->urgencia;
             $this->departamento_id = $req->departamento_id;
             $this->centro_costo_id = $req->centro_costo_id;
             $this->justificacion   = $req->justificacion;
+            $this->es_pago_factura = (bool) $req->es_pago_factura;
+            $this->factura_path    = $req->factura_path;
+            $this->factura_nombre  = $req->factura_nombre;
             $this->subtotal        = (float) $req->subtotal;
-            $this->iva             = (float) $req->iva;
+            $this->total_impuestos = 0;
             $this->total           = (float) $req->total;
 
-            // Partidas
             $this->items = $req->items->map(function ($it) {
                 return [
+                    'id'                   => $it->id,
                     'descripcion'          => $it->descripcion,
                     'unidad'               => $it->unidad,
+                    'unidad_medida_id'     => $it->unidad_medida_id,
                     'cantidad'             => (float) $it->cantidad,
                     'precio_unitario'      => (float) $it->precio_unitario,
                     'subtotal'             => (float) $it->subtotal,
+                    'tipo_impuesto_id'     => $it->tipo_impuesto_id,
+                    'monto_impuesto'       => (float) $it->monto_impuesto,
+                    'total_item'           => (float) $it->total_item,
                     'link_compra'          => $it->link_compra,
                     'proveedor_sugerido'   => $it->proveedor_sugerido,
+                    'archivos_existentes'  => $it->archivos->map(fn($a) => [
+                        'id'              => $a->id,
+                        'nombre_original' => $a->nombre_original,
+                        'tipo'            => $a->tipo,
+                        'url'             => Storage::disk('public')->url($a->path),
+                        'icono'           => $a->icono,
+                    ])->toArray(),
                     'ficha_tecnica_path'   => $it->ficha_tecnica_path,
                     'ficha_tecnica_nombre' => $it->ficha_tecnica_nombre,
                 ];
             })->toArray();
 
-            // Archivos (vacío al inicio; solo se llena si suben uno nuevo)
-            $this->fichas_tecnicas = array_fill(0, count($this->items), null);
+            $this->archivos_nuevos = array_fill(0, count($this->items), []);
 
         } else {
-            // Nuevo
-            $this->items = [[
-                'descripcion'          => '',
-                'unidad'               => '',
-                'cantidad'             => 1,
-                'precio_unitario'      => 0,
-                'subtotal'             => 0,
-                'link_compra'          => '',
-                'proveedor_sugerido'   => '',
-                'ficha_tecnica_path'   => null,
-                'ficha_tecnica_nombre' => null,
-            ]];
-
-            $this->fichas_tecnicas = [null];
+            $this->items           = [$this->itemVacio()];
+            $this->archivos_nuevos = [[]];
         }
 
         $this->recalcularTotales();
+    }
+
+    private function itemVacio(): array
+    {
+        return [
+            'id'                   => null,
+            'descripcion'          => '',
+            'unidad'               => '',
+            'unidad_medida_id'     => null,
+            'cantidad'             => 1,
+            'precio_unitario'      => 0,
+            'subtotal'             => 0,
+            'tipo_impuesto_id'     => null,
+            'monto_impuesto'       => 0,
+            'total_item'           => 0,
+            'link_compra'          => '',
+            'proveedor_sugerido'   => '',
+            'archivos_existentes'  => [],
+            'ficha_tecnica_path'   => null,
+            'ficha_tecnica_nombre' => null,
+        ];
     }
 
     public function render()
@@ -134,34 +168,63 @@ class RequisicionForm extends Component
         return view('livewire.requisiciones.requisicion-form');
     }
 
-    // --- UI acciones ---
+    // ─── Acciones de partidas ─────────────────────────────────────────────
+
     public function addItem(): void
     {
-        $this->items[] = [
-            'descripcion'          => '',
-            'unidad'               => '',
-            'cantidad'             => 1,
-            'precio_unitario'      => 0,
-            'subtotal'             => 0,
-            'link_compra'          => '',
-            'proveedor_sugerido'   => '',
-            'ficha_tecnica_path'   => null,
-            'ficha_tecnica_nombre' => null,
-        ];
-
-        $this->fichas_tecnicas[] = null;
+        $this->items[]           = $this->itemVacio();
+        $this->archivos_nuevos[] = [];
     }
 
     public function removeItem(int $index): void
     {
-        if (count($this->items) > 1) {
-            unset($this->items[$index]);
-            $this->items = array_values($this->items);
+        if (count($this->items) <= 1) return;
 
-            unset($this->fichas_tecnicas[$index]);
-            $this->fichas_tecnicas = array_values($this->fichas_tecnicas);
+        unset($this->items[$index]);
+        $this->items = array_values($this->items);
 
-            $this->recalcularTotales();
+        unset($this->archivos_nuevos[$index]);
+        $this->archivos_nuevos = array_values($this->archivos_nuevos);
+
+        $this->recalcularTotales();
+    }
+
+    public function removeArchivoExistente(int $itemIndex, int $archivoId): void
+    {
+        $archivo = RequisicionItemArchivo::find($archivoId);
+        if (!$archivo) return;
+
+        $item = \App\Models\RequisicionItem::find($archivo->requisicion_item_id);
+        if (!$item || $item->requisicion_id !== $this->requisicionId) return;
+
+        Storage::disk('public')->delete($archivo->path);
+        $archivo->delete();
+
+        $this->items[$itemIndex]['archivos_existentes'] = array_values(
+            array_filter(
+                $this->items[$itemIndex]['archivos_existentes'],
+                fn($a) => $a['id'] !== $archivoId
+            )
+        );
+    }
+
+    // Eliminar la factura guardada
+    public function removeFactura(): void
+    {
+        if ($this->factura_path) {
+            Storage::disk('public')->delete($this->factura_path);
+        }
+
+        $this->factura_path   = null;
+        $this->factura_nombre = null;
+        $this->factura_nueva  = null;
+
+        // Si ya está guardado en BD, limpiarlo
+        if ($this->requisicionId) {
+            Requisicion::where('id', $this->requisicionId)->update([
+                'factura_path'   => null,
+                'factura_nombre' => null,
+            ]);
         }
     }
 
@@ -172,42 +235,78 @@ class RequisicionForm extends Component
 
     private function recalcularTotales(): void
     {
-        $subtotal = 0;
+        $subtotalGeneral = 0;
+        $impuestoGeneral = 0;
+        $impuestosMap    = collect($this->tipos_impuesto)->keyBy('id');
+
         foreach ($this->items as $i => $row) {
             $cant = (float) ($row['cantidad'] ?? 0);
             $pu   = (float) ($row['precio_unitario'] ?? 0);
             $sub  = round($cant * $pu, 2);
 
-            $this->items[$i]['subtotal'] = $sub;
-            $subtotal += $sub;
+            $tipoId     = $row['tipo_impuesto_id'] ?? null;
+            $porcentaje = $tipoId ? (float) ($impuestosMap[$tipoId]['porcentaje'] ?? 0) : 0;
+            $montoImp   = round($sub * ($porcentaje / 100), 2);
+
+            $this->items[$i]['subtotal']       = $sub;
+            $this->items[$i]['monto_impuesto'] = $montoImp;
+            $this->items[$i]['total_item']     = round($sub + $montoImp, 2);
+
+            $subtotalGeneral += $sub;
+            $impuestoGeneral += $montoImp;
         }
 
-        $this->subtotal = round($subtotal, 2);
-        $this->iva      = round($this->subtotal * self::IVA_RATE, 2);
-        $this->total    = round($this->subtotal + $this->iva, 2);
+        $this->subtotal        = round($subtotalGeneral, 2);
+        $this->total_impuestos = round($impuestoGeneral, 2);
+        $this->total           = round($subtotalGeneral + $impuestoGeneral, 2);
     }
 
-    // --- Validación ---
+    // ─── Validación ───────────────────────────────────────────────────────
+
     private function rules(): array
     {
+        $facturaRules = $this->es_pago_factura
+            // Obligatorio si es pago de factura Y no hay ya una factura guardada
+            ? ($this->factura_path ? ['nullable'] : ['required'])
+            : ['nullable'];
+
         return [
-            'fecha_emision'    => ['required', 'date'],
-            'urgencia'         => ['required', 'in:normal,urgente'],
-            'departamento_id'  => ['required', 'exists:departamentos,id'],
-            'centro_costo_id'  => ['required', 'exists:departamentos,id'],
-            'justificacion'    => ['required', 'string', 'min:5'],
+            'fecha_emision'              => ['required', 'date'],
+            'urgencia'                   => ['required', 'in:normal,urgente'],
+            'departamento_id'            => ['required', 'exists:departamentos,id'],
+            'centro_costo_id'            => ['required', 'exists:departamentos,id'],
+            'justificacion'              => ['required', 'string', 'min:5'],
+            'es_pago_factura'            => ['boolean'],
 
-            'items'                       => ['required', 'array', 'min:1'],
-            'items.*.descripcion'         => ['required', 'string', 'min:2', 'max:255'],
-            'items.*.unidad'              => ['nullable', 'string', 'max:20'],
-            'items.*.cantidad'            => ['required', 'numeric', 'gt:0'],
-            'items.*.precio_unitario'     => ['required', 'numeric', 'gte:0'],
-            'items.*.link_compra'         => ['nullable', 'string', 'max:255'],
-            'items.*.proveedor_sugerido'  => ['nullable', 'string', 'max:255'],
+            // Factura: obligatoria cuando es pago de factura y no hay una ya guardada
+            'factura_nueva'              => array_merge(
+                $facturaRules,
+                ['file', 'max:10240', 'mimes:pdf,jpg,jpeg,png']
+            ),
 
-            // Archivos por partida
-            'fichas_tecnicas'     => ['array'],
-            'fichas_tecnicas.*'   => ['nullable', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,doc,docx,xls,xlsx'],
+            'items'                      => ['required', 'array', 'min:1'],
+            'items.*.descripcion'        => ['required', 'string', 'min:2', 'max:255'],
+            'items.*.unidad_medida_id'   => ['nullable', 'exists:unidades_medida,id'],
+            'items.*.cantidad'           => ['required', 'numeric', 'gt:0'],
+            'items.*.precio_unitario'    => ['required', 'numeric', 'gte:0'],
+            'items.*.tipo_impuesto_id'   => ['nullable', 'exists:tipos_impuesto,id'],
+            'items.*.link_compra'        => ['nullable', 'string', 'max:500'],
+            'items.*.proveedor_sugerido' => ['nullable', 'string', 'max:255'],
+
+            'archivos_nuevos'            => ['array'],
+            'archivos_nuevos.*'          => ['array', 'max:5'],
+            'archivos_nuevos.*.*'        => ['nullable', 'file', 'max:10240',
+                                             'mimes:pdf,jpg,jpeg,png,doc,docx,xls,xlsx'],
+        ];
+    }
+
+    private function validationMessages(): array
+    {
+        return [
+            'factura_nueva.required' => 'Debes adjuntar la factura para continuar. Es obligatoria en pagos de factura.',
+            'factura_nueva.file'     => 'El archivo de factura no es válido.',
+            'factura_nueva.max'      => 'La factura no debe superar 10 MB.',
+            'factura_nueva.mimes'    => 'La factura debe ser PDF, JPG o PNG.',
         ];
     }
 
@@ -221,126 +320,151 @@ class RequisicionForm extends Component
         return $prefix . str_pad((string) $count, 4, '0', STR_PAD_LEFT);
     }
 
-    // --- Guardados / Redirects ---
-    public function saveDraft()
+    // ─── Acciones de guardado ─────────────────────────────────────────────
+
+    public function saveDraft(): void
     {
         $this->persist('borrador');
         session()->flash('status', 'Requisición guardada en borrador.');
-        return redirect()->route('requisiciones.index');
+        $this->js("window.location.href = '" . route('requisiciones.index') . "'");
     }
 
-    public function sendToApproval()
+    public function sendToApproval(): void
     {
-        $req = $this->persist('en_aprobacion');
+        try {
+            $req = $this->persist('en_revision_compras');
 
-        $this->crearCadenaAprobacion($req);
+            User::role('compras')->get()
+                ->each(fn(User $u) => $u->notify(new RequisicionEnRevisionCompras($req, false)));
 
-        app(FlujoAprobacionService::class)->notificarSiguiente($req);
+            session()->flash('status', 'Requisición enviada a revisión del área de Compras.');
+            $this->js("window.location.href = '" . route('requisiciones.index') . "'");
 
-        session()->flash('status', 'Requisición enviada. Pasará al flujo de aprobación.');
-        return redirect()->route('requisiciones.index');
+        } catch (ValidationException $e) {
+            foreach ($e->errors() as $field => $messages) {
+                $this->addError($field, implode(' ', $messages));
+            }
+        } catch (\Exception $e) {
+            \Log::error('sendToApproval: ' . $e->getMessage() . ' en ' . $e->getFile() . ':' . $e->getLine());
+            $this->addError('general', 'Error al enviar: ' . $e->getMessage());
+        }
     }
+
+    public function reenviarACompras(): void
+    {
+        try {
+            $req = Requisicion::findOrFail($this->requisicionId);
+            abort_unless(
+                $req->solicitante_id === Auth::id() && $req->estado === 'rechazada_compras',
+                403
+            );
+
+            $req = $this->persist('en_revision_compras');
+
+            User::role('compras')->get()
+                ->each(fn(User $u) => $u->notify(new RequisicionEnRevisionCompras($req, true)));
+
+            session()->flash('status', 'Requisición reenviada a Compras con las correcciones.');
+            $this->js("window.location.href = '" . route('requisiciones.index') . "'");
+
+        } catch (ValidationException $e) {
+            foreach ($e->errors() as $field => $messages) {
+                $this->addError($field, implode(' ', $messages));
+            }
+        } catch (\Exception $e) {
+            \Log::error('reenviarACompras: ' . $e->getMessage());
+            $this->addError('general', 'Error al reenviar: ' . $e->getMessage());
+        }
+    }
+
+    // ─── Persistencia ─────────────────────────────────────────────────────
 
     private function persist(string $estado): Requisicion
     {
-        $this->validate($this->rules());
+        $this->validate($this->rules(), $this->validationMessages());
         $this->recalcularTotales();
 
         return DB::transaction(function () use ($estado) {
 
+            // Procesar la factura si se subió una nueva
+            $facturaPath   = $this->factura_path;
+            $facturaNombre = $this->factura_nombre;
+
+            if ($this->factura_nueva) {
+                // Borrar la anterior si existe
+                if ($facturaPath) {
+                    Storage::disk('public')->delete($facturaPath);
+                }
+                $facturaNombre = $this->factura_nueva->getClientOriginalName();
+                $facturaPath   = $this->factura_nueva->store('requisiciones/facturas', 'public');
+            }
+
+            $camposBase = [
+                'fecha_emision'   => $this->fecha_emision,
+                'departamento_id' => $this->departamento_id,
+                'centro_costo_id' => $this->centro_costo_id,
+                'justificacion'   => $this->justificacion,
+                'urgencia'        => $this->urgencia,
+                'es_pago_factura' => $this->es_pago_factura,
+                'factura_path'    => $this->es_pago_factura ? $facturaPath : null,
+                'factura_nombre'  => $this->es_pago_factura ? $facturaNombre : null,
+                'subtotal'        => $this->subtotal,
+                'iva'             => $this->total_impuestos,
+                'total'           => $this->total,
+                'estado'          => $estado,
+            ];
+
             if ($this->isEditing && $this->requisicionId) {
-                $req = Requisicion::with('items')->findOrFail($this->requisicionId);
+                $req       = Requisicion::with('items.archivos')->findOrFail($this->requisicionId);
+                $esCompras = Auth::user()->hasAnyRole(['compras', 'administrador']);
+                $esSol     = $req->solicitante_id === Auth::id();
 
-                abort_unless($req->solicitante_id === Auth::id() && $req->estado === 'borrador', 403);
+                abort_unless(
+                    ($esSol && in_array($req->estado, ['borrador', 'rechazada_compras'])) ||
+                    ($esCompras && $req->puedeEditarCompras()),
+                    403
+                );
 
-                $req->update([
-                    'fecha_emision'   => $this->fecha_emision,
-                    'departamento_id' => $this->departamento_id,
-                    'centro_costo_id' => $this->centro_costo_id,
-                    'justificacion'   => $this->justificacion,
-                    'subtotal'        => $this->subtotal,
-                    'iva'             => $this->iva,
-                    'total'           => $this->total,
-                    'urgencia'        => $this->urgencia,
-                    'estado'          => $estado,
-                ]);
+                if ($req->estado === 'rechazada_compras') {
+                    $camposBase['motivo_rechazo_compras'] = null;
+                }
 
-                // BORRAMOS items y los recreamos, PERO conservando archivos si no suben nuevo
+                $req->update($camposBase);
+
+                $idsActuales     = collect($this->items)->pluck('id')->filter()->all();
+                $itemsEliminados = $req->items->whereNotIn('id', $idsActuales);
+
+                foreach ($itemsEliminados as $itemElim) {
+                    foreach ($itemElim->archivos as $arch) {
+                        Storage::disk('public')->delete($arch->path);
+                    }
+                }
+
                 $req->items()->delete();
 
                 foreach ($this->items as $i => $row) {
-                    $oldPath = $row['ficha_tecnica_path'] ?? null;
-                    $oldName = $row['ficha_tecnica_nombre'] ?? null;
-
-                    $upload = $this->fichas_tecnicas[$i] ?? null;
-
-                    $finalPath = $oldPath;
-                    $finalName = $oldName;
-
-                    // Si subieron nuevo archivo para esta partida: borrar anterior + guardar nuevo
-                    if ($upload) {
-                        if ($oldPath) {
-                            Storage::disk('public')->delete($oldPath);
-                        }
-                        $finalName = $upload->getClientOriginalName();
-                        $finalPath = $upload->store('requisiciones/fichas', 'public');
-                    }
-
-                    $req->items()->create([
-                        'descripcion'          => $row['descripcion'],
-                        'unidad'               => $row['unidad'] ?: null,
-                        'cantidad'             => (float) $row['cantidad'],
-                        'precio_unitario'      => (float) $row['precio_unitario'],
-                        'subtotal'             => (float) ($row['subtotal'] ?? 0),
-                        'link_compra'          => $row['link_compra'] ?: null,
-                        'proveedor_sugerido'   => $row['proveedor_sugerido'] ?: null,
-                        'ficha_tecnica_path'   => $finalPath,
-                        'ficha_tecnica_nombre' => $finalName,
-                    ]);
+                    $item = $req->items()->create($this->mapItemData($row));
+                    $this->guardarArchivosNuevos($item, $i, $row['archivos_existentes'] ?? []);
                 }
 
-                $this->requisicionId = $req->id;
+                // Actualizar propiedades locales con la factura guardada
+                $this->factura_path   = $facturaPath;
+                $this->factura_nombre = $facturaNombre;
+                $this->factura_nueva  = null;
+
                 return $req;
 
             } else {
                 $fecha = Carbon::parse($this->fecha_emision);
 
-                $req = Requisicion::create([
-                    'folio'           => $this->generateFolio($fecha),
-                    'fecha_emision'   => $fecha->toDateString(),
-                    'solicitante_id'  => Auth::id(),
-                    'departamento_id' => $this->departamento_id,
-                    'centro_costo_id' => $this->centro_costo_id,
-                    'justificacion'   => $this->justificacion,
-                    'subtotal'        => $this->subtotal,
-                    'iva'             => $this->iva,
-                    'total'           => $this->total,
-                    'urgencia'        => $this->urgencia,
-                    'estado'          => $estado,
-                ]);
+                $req = Requisicion::create(array_merge($camposBase, [
+                    'folio'          => $this->generateFolio($fecha),
+                    'solicitante_id' => Auth::id(),
+                ]));
 
                 foreach ($this->items as $i => $row) {
-                    $upload = $this->fichas_tecnicas[$i] ?? null;
-
-                    $finalPath = null;
-                    $finalName = null;
-
-                    if ($upload) {
-                        $finalName = $upload->getClientOriginalName();
-                        $finalPath = $upload->store('requisiciones/fichas', 'public');
-                    }
-
-                    $req->items()->create([
-                        'descripcion'          => $row['descripcion'],
-                        'unidad'               => $row['unidad'] ?: null,
-                        'cantidad'             => (float) $row['cantidad'],
-                        'precio_unitario'      => (float) $row['precio_unitario'],
-                        'subtotal'             => (float) ($row['subtotal'] ?? 0),
-                        'link_compra'          => $row['link_compra'] ?: null,
-                        'proveedor_sugerido'   => $row['proveedor_sugerido'] ?: null,
-                        'ficha_tecnica_path'   => $finalPath,
-                        'ficha_tecnica_nombre' => $finalName,
-                    ]);
+                    $item = $req->items()->create($this->mapItemData($row));
+                    $this->guardarArchivosNuevos($item, $i, []);
                 }
 
                 $this->requisicionId = $req->id;
@@ -349,108 +473,48 @@ class RequisicionForm extends Component
         });
     }
 
-    // ---------- Cadena de aprobación ----------
-    private function crearCadenaAprobacion(Requisicion $req): void
+    private function mapItemData(array $row): array
     {
-        $req->aprobaciones()->delete();
-
-        $nivelJefe = NivelAprobacion::query()
-            ->where('rol_aprobador', 'jefe')
-            ->where('activo', true)
-            ->first();
-
-        $nivelArea = NivelAprobacion::query()
-            ->where('rol_aprobador', 'gerente_area')
-            ->where('activo', true)
-            ->first();
-
-        if (!$nivelJefe || !$nivelArea) {
-            throw ValidationException::withMessages([
-                'aprobaciones' => "Faltan niveles activos base (jefe / gerente_area) en niveles_aprobacion.",
-            ]);
-        }
-
-        $jefeId = $this->resolverJefeDirecto($req->solicitante_id);
-
-        if (!$jefeId) {
-            throw ValidationException::withMessages([
-                'aprobaciones' => 'El solicitante no tiene jefe directo asignado (users.supervisor_id).',
-            ]);
-        }
-
-        Aprobacion::create([
-            'requisicion_id'      => $req->id,
-            'nivel_aprobacion_id' => $nivelJefe->id,
-            'aprobador_id'        => $jefeId,
-            'estado'              => 'pendiente',
-        ]);
-
-        $req->loadMissing('departamentoRef');
-
-        $gerenteAreaId = $req->departamentoRef?->gerente_id;
-
-        if (!$gerenteAreaId) {
-            throw ValidationException::withMessages([
-                'aprobaciones' => 'El departamento no tiene gerente asignado (departamentos.gerente_id).',
-            ]);
-        }
-
-        Aprobacion::create([
-            'requisicion_id'      => $req->id,
-            'nivel_aprobacion_id' => $nivelArea->id,
-            'aprobador_id'        => $gerenteAreaId,
-            'estado'              => 'pendiente',
-        ]);
-
-        $totalCentavos  = (int) round(((float) $req->total) * 100);
-        $limiteCentavos = 500000; // 5000.00 * 100
-
-        if ($totalCentavos > $limiteCentavos) {
-            $nivelAdm = NivelAprobacion::query()
-                ->where('rol_aprobador', 'gerencia_adm')
-                ->where('activo', true)
-                ->first();
-
-            if (!$nivelAdm) {
-                throw ValidationException::withMessages([
-                    'aprobaciones' => "No existe un nivel activo para 'gerencia_adm' en niveles_aprobacion.",
-                ]);
-            }
-
-            Aprobacion::create([
-                'requisicion_id'      => $req->id,
-                'nivel_aprobacion_id' => $nivelAdm->id,
-                'aprobador_id'        => null,
-                'estado'              => 'pendiente',
-            ]);
-        }
-    }
-
-    private function resolverJefeDirecto(int $empleadoId): ?int
-    {
-        return User::where('id', $empleadoId)->value('supervisor_id');
-    }
-
-    private function findUserIdByRole(string $role): ?int
-    {
-        return User::role($role)->value('id');
-    }
-
-    private function nivelPorMonto(float $total): ?NivelAprobacion
-    {
-        return NivelAprobacion::where('rol_aprobador', '!=', 'jefe')
-            ->where('monto_min', '<=', $total)
-            ->where(fn ($q) => $q->where('monto_max', '>=', $total)->orWhereNull('monto_max'))
-            ->orderBy('orden')
-            ->first();
-    }
-
-    private function rolesQuePuedenFirmar(string $rolAprobador): array
-    {
-        $map = [
-            'gerencia_alta' => ['gerencia_adm', 'gerencia_finanzas'],
+        return [
+            'descripcion'          => $row['descripcion'],
+            'unidad'               => $row['unidad'] ?: null,
+            'unidad_medida_id'     => $row['unidad_medida_id'] ?: null,
+            'cantidad'             => (float) $row['cantidad'],
+            'precio_unitario'      => (float) $row['precio_unitario'],
+            'subtotal'             => (float) ($row['subtotal'] ?? 0),
+            'tipo_impuesto_id'     => $row['tipo_impuesto_id'] ?: null,
+            'monto_impuesto'       => (float) ($row['monto_impuesto'] ?? 0),
+            'total_item'           => (float) ($row['total_item'] ?? 0),
+            'link_compra'          => $row['link_compra'] ?: null,
+            'proveedor_sugerido'   => $row['proveedor_sugerido'] ?: null,
+            'ficha_tecnica_path'   => $row['ficha_tecnica_path'] ?? null,
+            'ficha_tecnica_nombre' => $row['ficha_tecnica_nombre'] ?? null,
         ];
+    }
 
-        return $map[$rolAprobador] ?? [$rolAprobador];
+    private function guardarArchivosNuevos(\App\Models\RequisicionItem $item, int $index, array $existentes): void
+    {
+        $uploads     = $this->archivos_nuevos[$index] ?? [];
+        if (empty($uploads)) return;
+
+        $disponibles = max(0, 5 - count($existentes));
+
+        foreach (array_slice($uploads, 0, $disponibles) as $upload) {
+            if (!$upload) continue;
+
+            $path   = $upload->store('requisiciones/archivos', 'public');
+            $nombre = strtolower($upload->getClientOriginalName());
+            $tipo   = str_contains($nombre, 'cotiz') ? 'cotizacion' : 'ficha_tecnica';
+
+            RequisicionItemArchivo::create([
+                'requisicion_item_id' => $item->id,
+                'tipo'                => $tipo,
+                'nombre_original'     => $upload->getClientOriginalName(),
+                'path'                => $path,
+                'mime_type'           => $upload->getMimeType(),
+                'tamanio'             => $upload->getSize(),
+                'subido_por_id'       => Auth::id(),
+            ]);
+        }
     }
 }

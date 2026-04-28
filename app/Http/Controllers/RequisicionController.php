@@ -16,10 +16,12 @@ class RequisicionController extends Controller
 
     public function index(Request $request)
     {
-        $estado      = $request->query('estado');
-        $solicitante = $request->query('solicitante');
-        $user        = auth()->user();
-
+        $estado       = $request->query('estado');
+        $solicitante  = $request->query('solicitante');
+        $metodo_pago  = $request->query('metodo_pago');
+        $pago_factura = $request->query('pago_factura');
+        $user         = auth()->user();
+ 
         $requisiciones = Requisicion::with([
                 'solicitante',
                 'departamentoRef',
@@ -28,15 +30,23 @@ class RequisicionController extends Controller
                 'aprobaciones.aprobador',
             ])
             ->visibleTo($user)
-            ->when($estado, fn($q) => $q->where('estado', $estado))
+            ->when($estado,      fn($q) => $q->where('estado', $estado))
             ->when($solicitante, fn($q) => $q->where('solicitante_id', $solicitante))
+            ->when($metodo_pago, fn($q) => $q->where('metodo_pago', $metodo_pago))
+            ->when($pago_factura !== null && $pago_factura !== '',
+                fn($q) => $q->where('es_pago_factura', (bool) $pago_factura)
+            )
             ->latest('id')
             ->paginate(15)
             ->appends($request->query());
-
-        $solicitantes = User::orderBy('name')->get(['id','name']);
-
-        return view('requisiciones.index', compact('requisiciones','solicitantes','estado','solicitante','user'));
+ 
+        $solicitantes = \App\Models\User::orderBy('name')->get(['id', 'name']);
+ 
+        return view('requisiciones.index', compact(
+            'requisiciones', 'solicitantes',
+            'estado', 'solicitante', 'metodo_pago', 'pago_factura',
+            'user',
+        ));
     }
 
     public function create()
@@ -44,29 +54,40 @@ class RequisicionController extends Controller
         return view('requisiciones.create');
     }
 
-    public function edit(Requisicion $requisicion)
+        public function edit(Requisicion $requisicion)
     {
         $this->authorize('update', $requisicion);
+ 
+        // Cargar relación revisadoPor para mostrar en el banner de rechazo
+        $requisicion->load(['revisadoPor']);
+ 
         return view('requisiciones.edit', compact('requisicion'));
     }
+ 
+
 
     public function show(Requisicion $requisicion)
     {
         $this->authorize('view', $requisicion);
-
+ 
         $requisicion->load([
             'solicitante',
             'departamentoRef',
             'centroCostoRef',
-            'items',
+            'revisadoPor',              // nuevo
+            'items.unidadMedida',
+            'items.tipoImpuesto',
+            'items.archivos',
             'aprobaciones.nivel',
-            'aprobaciones.aprobador'
+            'aprobaciones.aprobador',
         ]);
-
+ 
         $puedeFirmar = auth()->user()->can('approve', $requisicion);
-
-        return view('requisiciones.show', compact('requisicion','puedeFirmar'));
+ 
+        return view('requisiciones.show', compact('requisicion', 'puedeFirmar'));
     }
+ 
+
 
     public function recibir(Requisicion $requisicion)
     {
