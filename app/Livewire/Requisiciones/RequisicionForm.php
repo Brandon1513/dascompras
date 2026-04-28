@@ -21,37 +21,31 @@ class RequisicionForm extends Component
 {
     use WithFileUploads;
 
-    // --- Cabecera ---
-    public ?int $requisicionId   = null;
-    public bool $isEditing       = false;
-
+    public ?int  $requisicionId    = null;
+    public bool  $isEditing        = false;
     public string $fecha_emision;
-    public string $urgencia           = 'normal';
-    public ?int   $departamento_id    = null;
-    public ?int   $centro_costo_id    = null;
-    public string $justificacion      = '';
+    public string $urgencia          = 'normal';
+    public ?int   $departamento_id   = null;
+    public ?int   $centro_costo_id   = null;
+    public string $justificacion     = '';
     public string $solicitante_nombre = '';
-    public bool   $es_pago_factura    = false;
-    public string $estado_actual      = 'borrador';
+    public bool   $es_pago_factura   = false;
+    public string $estado_actual     = 'borrador';
 
-    // Factura adjunta (solo cuando es_pago_factura = true)
-    public mixed  $factura_nueva      = null;  // TemporaryUploadedFile
-    public ?string $factura_path      = null;  // Path guardado en BD
-    public ?string $factura_nombre    = null;  // Nombre original
+    public mixed   $factura_nueva    = null;
+    public ?string $factura_path     = null;
+    public ?string $factura_nombre   = null;
 
-    // --- Partidas ---
-    public array $items           = [];
-    public array $archivos_nuevos = [];
+    public array $items            = [];
+    public array $archivos_nuevos  = [];
 
-    // Totales
-    public float $subtotal        = 0;
-    public float $total_impuestos = 0;
-    public float $total           = 0;
+    public float $subtotal         = 0;
+    public float $total_impuestos  = 0;
+    public float $total            = 0;
 
-    // Catálogos
-    public array $departamentos   = [];
-    public array $unidades_medida = [];
-    public array $tipos_impuesto  = [];
+    public array $departamentos    = [];
+    public array $unidades_medida  = [];
+    public array $tipos_impuesto   = [];
 
     public function mount(?int $requisicionId = null): void
     {
@@ -81,7 +75,7 @@ class RequisicionForm extends Component
             $this->isEditing     = true;
             $this->requisicionId = $requisicionId;
 
-            $req = Requisicion::with(['items.archivos', 'items.unidadMedida', 'items.tipoImpuesto'])
+            $req = Requisicion::with(['items.archivos', 'items.unidadMedida', 'items.tipoImpuesto', 'items.tipoImpuesto2'])
                 ->findOrFail($requisicionId);
 
             $esCompras     = Auth::user()->hasAnyRole(['compras', 'administrador']);
@@ -117,6 +111,8 @@ class RequisicionForm extends Component
                     'subtotal'             => (float) $it->subtotal,
                     'tipo_impuesto_id'     => $it->tipo_impuesto_id,
                     'monto_impuesto'       => (float) $it->monto_impuesto,
+                    'tipo_impuesto_id_2'   => $it->tipo_impuesto_id_2,
+                    'monto_impuesto_2'     => (float) $it->monto_impuesto_2,
                     'total_item'           => (float) $it->total_item,
                     'link_compra'          => $it->link_compra,
                     'proveedor_sugerido'   => $it->proveedor_sugerido,
@@ -154,6 +150,8 @@ class RequisicionForm extends Component
             'subtotal'             => 0,
             'tipo_impuesto_id'     => null,
             'monto_impuesto'       => 0,
+            'tipo_impuesto_id_2'   => null,
+            'monto_impuesto_2'     => 0,
             'total_item'           => 0,
             'link_compra'          => '',
             'proveedor_sugerido'   => '',
@@ -168,7 +166,7 @@ class RequisicionForm extends Component
         return view('livewire.requisiciones.requisicion-form');
     }
 
-    // ─── Acciones de partidas ─────────────────────────────────────────────
+    // ─── Acciones de partidas ─────────────────────────────────────────────────
 
     public function addItem(): void
     {
@@ -208,18 +206,15 @@ class RequisicionForm extends Component
         );
     }
 
-    // Eliminar la factura guardada
     public function removeFactura(): void
     {
         if ($this->factura_path) {
             Storage::disk('public')->delete($this->factura_path);
         }
-
         $this->factura_path   = null;
         $this->factura_nombre = null;
         $this->factura_nueva  = null;
 
-        // Si ya está guardado en BD, limpiarlo
         if ($this->requisicionId) {
             Requisicion::where('id', $this->requisicionId)->update([
                 'factura_path'   => null,
@@ -228,6 +223,9 @@ class RequisicionForm extends Component
         }
     }
 
+    // ─── Recálculo reactivo ───────────────────────────────────────────────────
+    // Se dispara con wire:model.live en cantidad, precio e impuestos
+
     public function updatedItems(): void
     {
         $this->recalcularTotales();
@@ -235,25 +233,32 @@ class RequisicionForm extends Component
 
     private function recalcularTotales(): void
     {
-        $subtotalGeneral = 0;
-        $impuestoGeneral = 0;
-        $impuestosMap    = collect($this->tipos_impuesto)->keyBy('id');
+        $subtotalGeneral  = 0;
+        $impuestoGeneral  = 0;
+        $impuestosMap     = collect($this->tipos_impuesto)->keyBy('id');
 
         foreach ($this->items as $i => $row) {
             $cant = (float) ($row['cantidad'] ?? 0);
             $pu   = (float) ($row['precio_unitario'] ?? 0);
             $sub  = round($cant * $pu, 2);
 
-            $tipoId     = $row['tipo_impuesto_id'] ?? null;
-            $porcentaje = $tipoId ? (float) ($impuestosMap[$tipoId]['porcentaje'] ?? 0) : 0;
-            $montoImp   = round($sub * ($porcentaje / 100), 2);
+            // Impuesto 1
+            $tipoId1  = $row['tipo_impuesto_id'] ?? null;
+            $pct1     = $tipoId1 ? (float) ($impuestosMap[$tipoId1]['porcentaje'] ?? 0) : 0;
+            $imp1     = round($sub * ($pct1 / 100), 2);
 
-            $this->items[$i]['subtotal']       = $sub;
-            $this->items[$i]['monto_impuesto'] = $montoImp;
-            $this->items[$i]['total_item']     = round($sub + $montoImp, 2);
+            // Impuesto 2 — sobre el subtotal, independiente del impuesto 1
+            $tipoId2  = $row['tipo_impuesto_id_2'] ?? null;
+            $pct2     = $tipoId2 ? (float) ($impuestosMap[$tipoId2]['porcentaje'] ?? 0) : 0;
+            $imp2     = round($sub * ($pct2 / 100), 2);
+
+            $this->items[$i]['subtotal']        = $sub;
+            $this->items[$i]['monto_impuesto']  = $imp1;
+            $this->items[$i]['monto_impuesto_2'] = $imp2;
+            $this->items[$i]['total_item']      = round($sub + $imp1 + $imp2, 2);
 
             $subtotalGeneral += $sub;
-            $impuestoGeneral += $montoImp;
+            $impuestoGeneral += $imp1 + $imp2;
         }
 
         $this->subtotal        = round($subtotalGeneral, 2);
@@ -261,49 +266,44 @@ class RequisicionForm extends Component
         $this->total           = round($subtotalGeneral + $impuestoGeneral, 2);
     }
 
-    // ─── Validación ───────────────────────────────────────────────────────
+    // ─── Validación ───────────────────────────────────────────────────────────
 
     private function rules(): array
     {
-        $facturaRules = $this->es_pago_factura
-            // Obligatorio si es pago de factura Y no hay ya una factura guardada
-            ? ($this->factura_path ? ['nullable'] : ['required'])
+        $facturaRules = $this->es_pago_factura && !$this->factura_path
+            ? ['required']
             : ['nullable'];
 
         return [
-            'fecha_emision'              => ['required', 'date'],
-            'urgencia'                   => ['required', 'in:normal,urgente'],
-            'departamento_id'            => ['required', 'exists:departamentos,id'],
-            'centro_costo_id'            => ['required', 'exists:departamentos,id'],
-            'justificacion'              => ['required', 'string', 'min:5'],
-            'es_pago_factura'            => ['boolean'],
+            'fecha_emision'               => ['required', 'date'],
+            'urgencia'                    => ['required', 'in:normal,urgente'],
+            'departamento_id'             => ['required', 'exists:departamentos,id'],
+            'centro_costo_id'             => ['required', 'exists:departamentos,id'],
+            'justificacion'               => ['required', 'string', 'min:5'],
+            'es_pago_factura'             => ['boolean'],
+            'factura_nueva'               => array_merge($facturaRules, ['file', 'max:10240', 'mimes:pdf,jpg,jpeg,png']),
 
-            // Factura: obligatoria cuando es pago de factura y no hay una ya guardada
-            'factura_nueva'              => array_merge(
-                $facturaRules,
-                ['file', 'max:10240', 'mimes:pdf,jpg,jpeg,png']
-            ),
+            'items'                       => ['required', 'array', 'min:1'],
+            'items.*.descripcion'         => ['required', 'string', 'min:2', 'max:255'],
+            'items.*.unidad_medida_id'    => ['nullable', 'exists:unidades_medida,id'],
+            'items.*.cantidad'            => ['required', 'integer', 'min:1'],
+            'items.*.precio_unitario'     => ['required', 'numeric', 'gte:0'],
+            'items.*.tipo_impuesto_id'    => ['nullable', 'exists:tipos_impuesto,id'],
+            'items.*.tipo_impuesto_id_2'  => ['nullable', 'exists:tipos_impuesto,id'],
+            'items.*.link_compra'         => ['nullable', 'string', 'max:500'],
+            'items.*.proveedor_sugerido'  => ['nullable', 'string', 'max:255'],
 
-            'items'                      => ['required', 'array', 'min:1'],
-            'items.*.descripcion'        => ['required', 'string', 'min:2', 'max:255'],
-            'items.*.unidad_medida_id'   => ['nullable', 'exists:unidades_medida,id'],
-            'items.*.cantidad'           => ['required', 'numeric', 'gt:0'],
-            'items.*.precio_unitario'    => ['required', 'numeric', 'gte:0'],
-            'items.*.tipo_impuesto_id'   => ['nullable', 'exists:tipos_impuesto,id'],
-            'items.*.link_compra'        => ['nullable', 'string', 'max:500'],
-            'items.*.proveedor_sugerido' => ['nullable', 'string', 'max:255'],
-
-            'archivos_nuevos'            => ['array'],
-            'archivos_nuevos.*'          => ['array', 'max:5'],
-            'archivos_nuevos.*.*'        => ['nullable', 'file', 'max:10240',
-                                             'mimes:pdf,jpg,jpeg,png,doc,docx,xls,xlsx'],
+            'archivos_nuevos'             => ['array'],
+            'archivos_nuevos.*'           => ['array', 'max:5'],
+            'archivos_nuevos.*.*'         => ['nullable', 'file', 'max:10240',
+                                              'mimes:pdf,jpg,jpeg,png,doc,docx,xls,xlsx'],
         ];
     }
 
     private function validationMessages(): array
     {
         return [
-            'factura_nueva.required' => 'Debes adjuntar la factura para continuar. Es obligatoria en pagos de factura.',
+            'factura_nueva.required' => 'Debes adjuntar la factura para continuar.',
             'factura_nueva.file'     => 'El archivo de factura no es válido.',
             'factura_nueva.max'      => 'La factura no debe superar 10 MB.',
             'factura_nueva.mimes'    => 'La factura debe ser PDF, JPG o PNG.',
@@ -320,7 +320,7 @@ class RequisicionForm extends Component
         return $prefix . str_pad((string) $count, 4, '0', STR_PAD_LEFT);
     }
 
-    // ─── Acciones de guardado ─────────────────────────────────────────────
+    // ─── Acciones ─────────────────────────────────────────────────────────────
 
     public function saveDraft(): void
     {
@@ -345,7 +345,7 @@ class RequisicionForm extends Component
                 $this->addError($field, implode(' ', $messages));
             }
         } catch (\Exception $e) {
-            \Log::error('sendToApproval: ' . $e->getMessage() . ' en ' . $e->getFile() . ':' . $e->getLine());
+            \Log::error('sendToApproval: ' . $e->getMessage());
             $this->addError('general', 'Error al enviar: ' . $e->getMessage());
         }
     }
@@ -377,7 +377,7 @@ class RequisicionForm extends Component
         }
     }
 
-    // ─── Persistencia ─────────────────────────────────────────────────────
+    // ─── Persistencia ─────────────────────────────────────────────────────────
 
     private function persist(string $estado): Requisicion
     {
@@ -386,15 +386,11 @@ class RequisicionForm extends Component
 
         return DB::transaction(function () use ($estado) {
 
-            // Procesar la factura si se subió una nueva
             $facturaPath   = $this->factura_path;
             $facturaNombre = $this->factura_nombre;
 
             if ($this->factura_nueva) {
-                // Borrar la anterior si existe
-                if ($facturaPath) {
-                    Storage::disk('public')->delete($facturaPath);
-                }
+                if ($facturaPath) Storage::disk('public')->delete($facturaPath);
                 $facturaNombre = $this->factura_nueva->getClientOriginalName();
                 $facturaPath   = $this->factura_nueva->store('requisiciones/facturas', 'public');
             }
@@ -447,7 +443,6 @@ class RequisicionForm extends Component
                     $this->guardarArchivosNuevos($item, $i, $row['archivos_existentes'] ?? []);
                 }
 
-                // Actualizar propiedades locales con la factura guardada
                 $this->factura_path   = $facturaPath;
                 $this->factura_nombre = $facturaNombre;
                 $this->factura_nueva  = null;
@@ -484,6 +479,8 @@ class RequisicionForm extends Component
             'subtotal'             => (float) ($row['subtotal'] ?? 0),
             'tipo_impuesto_id'     => $row['tipo_impuesto_id'] ?: null,
             'monto_impuesto'       => (float) ($row['monto_impuesto'] ?? 0),
+            'tipo_impuesto_id_2'   => $row['tipo_impuesto_id_2'] ?: null,
+            'monto_impuesto_2'     => (float) ($row['monto_impuesto_2'] ?? 0),
             'total_item'           => (float) ($row['total_item'] ?? 0),
             'link_compra'          => $row['link_compra'] ?: null,
             'proveedor_sugerido'   => $row['proveedor_sugerido'] ?: null,

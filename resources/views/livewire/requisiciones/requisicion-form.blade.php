@@ -1,7 +1,6 @@
 <div class="min-h-screen py-6" style="background: linear-gradient(160deg, #f8f5ff 0%, #f1f5f9 50%, #f8f5ff 100%);">
 <div class="max-w-5xl px-4 mx-auto space-y-4 sm:px-6 lg:px-8">
 
-    {{-- Error general --}}
     @error('general')
         <div class="flex items-center gap-2 p-4 text-sm font-medium text-red-800 border border-red-200 rounded-xl bg-red-50">
             ⚠️ {{ $message }}
@@ -53,7 +52,7 @@
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <div>
                     <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Fecha de elaboración</label>
-                    <input type="date" wire:model.lazy="fecha_emision"
+                    <input type="date" wire:model.live="fecha_emision"
                            class="w-full rounded-lg border-gray-200 text-sm shadow-sm focus:ring-purple-500 focus:border-purple-500
                                   @error('fecha_emision') border-red-400 @enderror">
                     @error('fecha_emision') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
@@ -61,7 +60,7 @@
 
                 <div>
                     <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Urgencia</label>
-                    <select wire:model="urgencia"
+                    <select wire:model.live="urgencia"
                             class="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
                         <option value="normal">Normal</option>
                         <option value="urgente">🔴 Urgente</option>
@@ -80,7 +79,7 @@
                     <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                         Departamento solicitante <span class="text-red-400">*</span>
                     </label>
-                    <select wire:model="departamento_id"
+                    <select wire:model.live="departamento_id"
                             class="w-full rounded-lg border-gray-200 text-sm shadow-sm focus:ring-purple-500 focus:border-purple-500
                                    @error('departamento_id') border-red-400 @enderror">
                         <option value="">— Selecciona —</option>
@@ -95,7 +94,7 @@
                     <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                         Centro de costos <span class="text-red-400">*</span>
                     </label>
-                    <select wire:model="centro_costo_id"
+                    <select wire:model.live="centro_costo_id"
                             class="w-full rounded-lg border-gray-200 text-sm shadow-sm focus:ring-purple-500 focus:border-purple-500
                                    @error('centro_costo_id') border-red-400 @enderror">
                         <option value="">— Selecciona —</option>
@@ -111,34 +110,32 @@
                 <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                     Justificación de la compra <span class="text-red-400">*</span>
                 </label>
-                <textarea rows="3" wire:model.lazy="justificacion"
+                <textarea rows="3" wire:model.live="justificacion"
                           placeholder="Describe la necesidad o motivo de la compra..."
                           class="w-full rounded-lg border-gray-200 text-sm shadow-sm focus:ring-purple-500 focus:border-purple-500 resize-none
                                  @error('justificacion') border-red-400 @enderror"></textarea>
                 @error('justificacion') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
             </div>
-            <div class="flex flex-wrap px-1 gap-x-8 gap-y-2">
- 
-                    <div class="flex items-start gap-2">
-                        <span class="text-base shrink-0 mt-0.5">📅</span>
-                        <p class="text-xs leading-relaxed text-gray-500">
-                            <span class="font-semibold text-gray-700">Plazo de entrega:</span>
-                            El plazo máximo es de <strong class="text-gray-700">15 días naturales</strong>
-                            a partir de la orden de compra, salvo casos especiales informados al solicitante.
-                        </p>
-                    </div>
-                
-                    <div class="flex items-start gap-2">
-                        <span class="text-base shrink-0 mt-0.5">💰</span>
-                        <p class="text-xs leading-relaxed text-gray-500">
-                            <span class="font-semibold text-gray-700">Programación de pagos:</span>
-                            Para que el pago aplique en la semana en curso, la factura debe recibirse a más tardar el
-                            <strong class="text-gray-700">lunes a las 12:00 pm</strong>.
-                        </p>
-                    </div>
-                
-                </div>
 
+            {{-- Leyendas --}}
+            <div class="flex flex-wrap pt-1 gap-x-8 gap-y-2">
+                <div class="flex items-start gap-2">
+                    <span class="text-sm shrink-0 mt-0.5">📅</span>
+                    <p class="text-xs leading-relaxed text-gray-500">
+                        <span class="font-semibold text-gray-700">Plazo de entrega:</span>
+                        El plazo máximo es de <strong class="text-gray-700">15 días naturales</strong>
+                        a partir de la orden de compra, salvo casos especiales informados al solicitante.
+                    </p>
+                </div>
+                <div class="flex items-start gap-2">
+                    <span class="text-sm shrink-0 mt-0.5">💰</span>
+                    <p class="text-xs leading-relaxed text-gray-500">
+                        <span class="font-semibold text-gray-700">Programación de pagos:</span>
+                        Para que el pago aplique en la semana en curso, la factura debe recibirse a más tardar el
+                        <strong class="text-gray-700">lunes a las 12:00 pm</strong>.
+                    </p>
+                </div>
+            </div>
 
             {{-- Toggle pago de factura --}}
             <div class="pt-1 space-y-4">
@@ -161,9 +158,7 @@
                         <svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                         </svg>
-                        <span class="text-sm font-bold text-purple-700">
-                            Factura adjunta <span class="text-red-500">*</span>
-                        </span>
+                        <span class="text-sm font-bold text-purple-700">Factura adjunta <span class="text-red-500">*</span></span>
                         <span class="text-xs text-purple-400">(PDF, JPG o PNG · máx. 10 MB)</span>
                     </div>
 
@@ -238,7 +233,6 @@
             @foreach ($items as $i => $row)
             <div wire:key="item-{{ $i }}" class="p-5 space-y-4">
 
-                {{-- Número de partida --}}
                 <div class="flex items-center justify-between">
                     <span class="inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white rounded-full"
                           style="background: linear-gradient(135deg, #4A1660, #7c3aed);">
@@ -261,7 +255,7 @@
                         <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                             Descripción <span class="text-red-400">*</span>
                         </label>
-                        <input type="text" wire:model.lazy="items.{{ $i }}.descripcion"
+                        <input type="text" wire:model.live="items.{{ $i }}.descripcion"
                                placeholder="Producto o servicio"
                                class="w-full rounded-lg border-gray-200 text-sm shadow-sm focus:ring-purple-500 focus:border-purple-500
                                       @error("items.$i.descripcion") border-red-400 @enderror">
@@ -270,14 +264,14 @@
 
                     <div class="col-span-4 sm:col-span-2">
                         <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Cantidad</label>
-                        <input type="number" step="0.001" min="0"
-                               wire:model.debounce.400ms="items.{{ $i }}.cantidad"
-                               class="w-full text-sm text-right border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                        <input type="number" step="1" min="1"
+                                 wire:model.live="items.{{ $i }}.cantidad"
+                                    class="w-full text-sm text-right border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
                     </div>
 
                     <div class="col-span-8 sm:col-span-3">
                         <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Unidad</label>
-                        <select wire:model="items.{{ $i }}.unidad_medida_id"
+                        <select wire:model.live="items.{{ $i }}.unidad_medida_id"
                                 class="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
                             <option value="">— Unidad —</option>
                             @foreach ($unidades_medida as $um)
@@ -291,17 +285,19 @@
                         <div class="relative">
                             <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-300 text-xs font-bold">$</span>
                             <input type="number" step="0.01" min="0"
-                                   wire:model.debounce.400ms="items.{{ $i }}.precio_unitario"
+                                   wire:model.live="items.{{ $i }}.precio_unitario"
                                    class="w-full pl-6 text-sm text-right border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
                         </div>
                     </div>
                 </div>
 
-                {{-- Fila 2: Impuesto + Proveedor + Link + Mini total --}}
+                {{-- Fila 2: Impuestos + Proveedor + Link + Mini total --}}
                 <div class="grid grid-cols-12 gap-3">
+
+                    {{-- Impuesto 1 --}}
                     <div class="col-span-12 sm:col-span-3">
-                        <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Impuesto</label>
-                        <select wire:model="items.{{ $i }}.tipo_impuesto_id"
+                        <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Impuesto 1</label>
+                        <select wire:model.live="items.{{ $i }}.tipo_impuesto_id"
                                 class="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
                             <option value="">Sin impuesto</option>
                             @foreach ($tipos_impuesto as $ti)
@@ -310,17 +306,26 @@
                         </select>
                     </div>
 
-                    <div class="col-span-12 sm:col-span-4">
-                        <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Proveedor sugerido</label>
-                        <input type="text" wire:model.lazy="items.{{ $i }}.proveedor_sugerido"
-                               placeholder="Nombre del proveedor"
-                               class="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                    {{-- Impuesto 2 (opcional) --}}
+                    <div class="col-span-12 sm:col-span-3">
+                        <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                            Impuesto 2
+                            <span class="ml-1 font-normal text-gray-300 normal-case">(opcional)</span>
+                        </label>
+                        <select wire:model.live="items.{{ $i }}.tipo_impuesto_id_2"
+                                class="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                            <option value="">Sin segundo impuesto</option>
+                            @foreach ($tipos_impuesto as $ti)
+                                <option value="{{ $ti['id'] }}">{{ $ti['nombre'] }}</option>
+                            @endforeach
+                        </select>
                     </div>
 
-                    <div class="col-span-12 sm:col-span-3">
-                        <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Link de referencia</label>
-                        <input type="url" wire:model.lazy="items.{{ $i }}.link_compra"
-                               placeholder="https://..."
+                    {{-- Proveedor --}}
+                    <div class="col-span-12 sm:col-span-4">
+                        <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Proveedor sugerido</label>
+                        <input type="text" wire:model.live="items.{{ $i }}.proveedor_sugerido"
+                               placeholder="Nombre del proveedor"
                                class="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
                     </div>
 
@@ -333,8 +338,14 @@
                             </div>
                             @if(($row['monto_impuesto'] ?? 0) > 0)
                             <div class="flex justify-between text-gray-400">
-                                <span>Imp.</span>
+                                <span>Imp. 1</span>
                                 <span>${{ number_format($row['monto_impuesto'] ?? 0, 2) }}</span>
+                            </div>
+                            @endif
+                            @if(($row['monto_impuesto_2'] ?? 0) > 0)
+                            <div class="flex justify-between text-gray-400">
+                                <span>Imp. 2</span>
+                                <span>${{ number_format($row['monto_impuesto_2'] ?? 0, 2) }}</span>
                             </div>
                             @endif
                             <div class="flex justify-between pt-1 font-bold border-t border-purple-200" style="color: #4A1660">
@@ -342,6 +353,16 @@
                                 <span>${{ number_format($row['total_item'] ?? 0, 2) }}</span>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                {{-- Link de referencia en su propia fila --}}
+                <div class="grid grid-cols-12 gap-3">
+                    <div class="col-span-12 sm:col-span-6">
+                        <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Link de referencia</label>
+                        <input type="url" wire:model.live="items.{{ $i }}.link_compra"
+                               placeholder="https://..."
+                               class="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
                     </div>
                 </div>
 
@@ -417,7 +438,7 @@
         </div>
     </div>
 
-    {{-- ══ TOTALES ════════════════════════════════════════════════════════ --}}
+    {{-- ══ TOTALES ══════════════════════════════════════════════════════ --}}
     <div class="flex justify-end">
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 w-full max-w-xs space-y-2.5">
             <div class="flex justify-between text-sm text-gray-500">
@@ -435,7 +456,7 @@
         </div>
     </div>
 
-    {{-- ══ ACCIONES ════════════════════════════════════════════════════════ --}}
+    {{-- ══ ACCIONES ══════════════════════════════════════════════════════ --}}
     <div class="flex items-center justify-end gap-3 pb-6">
         <a href="{{ route('requisiciones.index') }}"
            class="px-4 py-2.5 text-sm font-medium text-gray-500 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition">

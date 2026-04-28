@@ -11,30 +11,32 @@ class RequisicionItem extends Model
     protected $table = 'requisicion_items';
 
     protected $fillable = [
-        // Campos originales
         'requisicion_id',
         'descripcion',
-        'unidad',               // Campo texto heredado (datos históricos)
+        'unidad',
         'cantidad',
         'precio_unitario',
         'subtotal',
         'link_compra',
         'proveedor_sugerido',
-        'ficha_tecnica_path',   // Heredado (datos históricos)
-        'ficha_tecnica_nombre', // Heredado (datos históricos)
-        // ── Nuevos campos ──────────────────────────────
-        'unidad_medida_id',     // FK al catálogo de unidades
-        'tipo_impuesto_id',     // FK al catálogo de impuestos (nullable = sin impuesto)
-        'monto_impuesto',       // Monto calculado del impuesto para esta partida
-        'total_item',           // subtotal + monto_impuesto
+        'ficha_tecnica_path',
+        'ficha_tecnica_nombre',
+        'unidad_medida_id',
+        'tipo_impuesto_id',
+        'monto_impuesto',
+        'total_item',
+        // Segundo impuesto
+        'tipo_impuesto_id_2',
+        'monto_impuesto_2',
     ];
 
     protected $casts = [
-        'cantidad'        => 'decimal:3',
-        'precio_unitario' => 'decimal:2',
-        'subtotal'        => 'decimal:2',
-        'monto_impuesto'  => 'decimal:2',
-        'total_item'      => 'decimal:2',
+        'cantidad'         => 'integer',
+        'precio_unitario'  => 'decimal:2',
+        'subtotal'         => 'decimal:2',
+        'monto_impuesto'   => 'decimal:2',
+        'monto_impuesto_2' => 'decimal:2',
+        'total_item'       => 'decimal:2',
     ];
 
     // ─── Relaciones ───────────────────────────────────────────────────────────
@@ -54,19 +56,21 @@ class RequisicionItem extends Model
         return $this->belongsTo(TipoImpuesto::class, 'tipo_impuesto_id');
     }
 
-    // Todos los archivos adjuntos de esta partida (max 5)
+    public function tipoImpuesto2(): BelongsTo
+    {
+        return $this->belongsTo(TipoImpuesto::class, 'tipo_impuesto_id_2');
+    }
+
     public function archivos(): HasMany
     {
         return $this->hasMany(RequisicionItemArchivo::class);
     }
 
-    // Solo fichas técnicas
     public function fichasTecnicas(): HasMany
     {
         return $this->hasMany(RequisicionItemArchivo::class)->where('tipo', 'ficha_tecnica');
     }
 
-    // Solo cotizaciones
     public function cotizaciones(): HasMany
     {
         return $this->hasMany(RequisicionItemArchivo::class)->where('tipo', 'cotizacion');
@@ -74,19 +78,11 @@ class RequisicionItem extends Model
 
     // ─── Accessors ────────────────────────────────────────────────────────────
 
-    /**
-     * Etiqueta de unidad: usa el catálogo si existe, si no el texto libre heredado.
-     * Ejemplo de uso en Blade: {{ $item->unidad_label }}
-     */
     public function getUnidadLabelAttribute(): string
     {
         return $this->unidadMedida?->abreviatura ?? $this->unidad ?? '—';
     }
 
-    /**
-     * Indica si este item tiene archivos adjuntos nuevos (tabla requisicion_item_archivos)
-     * o el archivo heredado (ficha_tecnica_path).
-     */
     public function tieneArchivos(): bool
     {
         return $this->archivos()->exists() || !empty($this->ficha_tecnica_path);
@@ -95,17 +91,24 @@ class RequisicionItem extends Model
     // ─── Helpers de cálculo ───────────────────────────────────────────────────
 
     /**
-     * Recalcula subtotal, monto_impuesto y total_item.
-     * Llamar antes de guardar cuando cambian cantidad, precio o tipo_impuesto.
-     *
-     * Uso: $item->calcularTotales(); $item->save();
+     * Recalcula subtotal, ambos impuestos y total_item.
+     * Ambos impuestos calculan sobre el subtotal (Opción A).
      */
     public function calcularTotales(): void
     {
         $this->subtotal = round((float) $this->cantidad * (float) $this->precio_unitario, 2);
 
-        $porcentaje = (float) ($this->tipoImpuesto?->porcentaje ?? 0);
-        $this->monto_impuesto = round($this->subtotal * ($porcentaje / 100), 2);
-        $this->total_item     = round($this->subtotal + $this->monto_impuesto, 2);
+        // Impuesto 1
+        $pct1 = (float) ($this->tipoImpuesto?->porcentaje ?? 0);
+        $this->monto_impuesto = round($this->subtotal * ($pct1 / 100), 2);
+
+        // Impuesto 2
+        $pct2 = (float) ($this->tipoImpuesto2?->porcentaje ?? 0);
+        $this->monto_impuesto_2 = round($this->subtotal * ($pct2 / 100), 2);
+
+        $this->total_item = round(
+            $this->subtotal + $this->monto_impuesto + $this->monto_impuesto_2,
+            2
+        );
     }
 }
