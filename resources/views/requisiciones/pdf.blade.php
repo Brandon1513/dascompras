@@ -24,7 +24,6 @@
   .totals .label { text-align:right; padding-right:10px; }
   .purple { background:#f3e8ff }
 
-  /* ✅ Firma en PDF */
   .firma-img{
     max-height:60px;
     max-width:100%;
@@ -36,12 +35,16 @@
     color:#333;
     line-height:1.1;
   }
+  .imp-label{
+    font-size:9px;
+    color:#777;
+    margin-top:2px;
+  }
 </style>
 </head>
 <body>
 
 @php
-  // ✅ Ordenar aprobaciones por orden del nivel
   $aps = ($requisicion->aprobaciones ?? collect())
           ->sortBy(fn($a) => $a->nivel?->orden ?? 999)
           ->values();
@@ -49,36 +52,28 @@
   $apPorRol = $aps->filter(fn($ap) => !empty($ap->nivel?->rol_aprobador))
                  ->keyBy(fn($ap) => $ap->nivel->rol_aprobador);
 
-  // ✅ Helper: retorna firma + nombre del firmante (si está aprobada)
   $apInfo = function(string $rol) use ($apPorRol) {
       $ap = $apPorRol->get($rol);
-      if (!$ap) return null;
-      if ($ap->estado !== 'aprobada') return null;
-
+      if (!$ap || $ap->estado !== 'aprobada') return null;
       $nombre = $ap->aprobador?->name
           ?? ($ap->aprobador_id ? ('ID: '.$ap->aprobador_id) : null)
           ?? ('Por rol: ' . ($ap->nivel?->rol_aprobador ?? '—'));
-
       return [
-          'firma'  => $ap->firma_data_uri ?? null, // viene del controller
+          'firma'  => $ap->firma_data_uri ?? null,
           'nombre' => $nombre,
       ];
   };
 
-  $jefe  = $apInfo('jefe');
-  $area  = $apInfo('gerente_area'); // Gerencia de Área
-  $adm   = $apInfo('gerencia_adm'); // Gerencia Administrativa
+  $jefe = $apInfo('jefe');
+  $area = $apInfo('gerente_operaciones') ?? $apInfo('gerente_area');
+  $adm  = $apInfo('gerencia_adm');
 
-  // ✅ Firma de recepción (viene del controller como $firmaRecepcionBase64)
-  $firmaRecep = $firmaRecepcionBase64 ?? null;
-
-  $fechaRec = $requisicion->fecha_recibido
+  $firmaRecep        = $firmaRecepcionBase64 ?? null;
+  $fechaRec          = $requisicion->fecha_recibido
       ? \Illuminate\Support\Carbon::parse($requisicion->fecha_recibido)->format('d-M-Y')
       : '';
-
-  $nombreAreaRec = trim(($requisicion->recibe_nombre ?? '').' '.(($requisicion->area_recibe ?? '') ? '— '.$requisicion->area_recibe : ''));
-
-  // ✅ Nombre que aparecerá debajo de firma de recepción
+  $nombreAreaRec     = trim(($requisicion->recibe_nombre ?? '')
+      . (($requisicion->area_recibe ?? '') ? ' — '.$requisicion->area_recibe : ''));
   $nombreRecibeFirma = $requisicion->recibe_nombre ?? '';
 @endphp
 
@@ -93,6 +88,11 @@
       <td class="t-center" style="border-left:none;">
         <div class="title">Requisición de Compra</div>
         <div class="t-muted">Folio: <b>{{ $requisicion->folio }}</b></div>
+        @if($requisicion->urgencia === 'urgente')
+          <div style="margin-top:4px; font-size:11px; color:#c2410c; font-weight:700;">
+            ⚠ Afecta proceso de producción
+          </div>
+        @endif
       </td>
       <td style="width:210px">
         <table class="table">
@@ -127,39 +127,69 @@
   <!-- Partidas -->
   <table class="table mt-12 partidas">
     <tr class="thead">
-      <th style="width:7%"  class="t-center">Cant.</th>
-      <th style="width:20%">Artículo</th>
-      <th style="width:8%"  class="t-center">Unidad</th>
-      <th style="width:30%">Especificaciones</th>
-      <th style="width:15%">Proveedor sugerido</th>
-      <th style="width:10%" class="t-right">Precio Unitario</th>
+      <th style="width:6%"  class="t-center">Cant.</th>
+      <th style="width:6%"  class="t-center">Unidad</th>
+      <th style="width:22%">Artículo / Descripción</th>
+      <th style="width:22%">Link de referencia</th>
+      <th style="width:14%">Proveedor sugerido</th>
+      <th style="width:10%" class="t-right">P. Unitario</th>
       <th style="width:10%" class="t-right">Subtotal</th>
+      <th style="width:10%" class="t-right">Impuesto(s)</th>
+      <th style="width:10%" class="t-right">Total</th>
     </tr>
 
     @forelse($requisicion->items as $it)
       @php
-        $cant = (float) ($it->cantidad ?? 0);
-        $pu   = (float) ($it->precio_unitario ?? 0);
-        $sub  = !is_null($it->subtotal) ? (float) $it->subtotal : ($cant * $pu);
+        $cant      = (int) ($it->cantidad ?? 0);
+        $pu        = (float) ($it->precio_unitario ?? 0);
+        $sub       = !is_null($it->subtotal) ? (float) $it->subtotal : ($cant * $pu);
+        $imp1      = (float) ($it->monto_impuesto ?? 0);
+        $imp2      = (float) ($it->monto_impuesto_2 ?? 0);
+        $impTotal  = $imp1 + $imp2;
+        $totalItem = !is_null($it->total_item) ? (float) $it->total_item : ($sub + $impTotal);
+
+        // Etiqueta de unidad: catálogo primero, luego campo texto heredado
+        $unidadLabel = $it->unidadMedida?->abreviatura ?? $it->unidad ?? '—';
+
+        // Etiquetas de impuestos
+        $imp1Label = $it->tipoImpuesto?->nombre ?? null;
+        $imp2Label = $it->tipoImpuesto2?->nombre ?? null;
       @endphp
 
       <tr>
-        <td class="t-center">{{ $it->cantidad }}</td>
+        <td class="t-center">{{ $cant }}</td>
+        <td class="t-center">{{ $unidadLabel }}</td>
         <td>{!! nl2br(e($it->descripcion ?? '')) !!}</td>
-        <td class="t-center">{{ $it->unidad ?? '' }}</td>
         <td>
           @if(!empty($it->link_compra))
-            <a href="{{ $it->link_compra }}">{{ $it->link_compra }}</a>
+            <a href="{{ $it->link_compra }}" style="font-size:9px; word-break:break-all;">
+              {{ $it->link_compra }}
+            </a>
           @else
-            <span class="t-muted">-</span>
+            <span class="t-muted">—</span>
           @endif
         </td>
-        <td>{{ $it->proveedor_sugerido ?? '-' }}</td>
+        <td>{{ $it->proveedor_sugerido ?? '—' }}</td>
         <td class="t-right">${{ number_format($pu, 2) }}</td>
         <td class="t-right">${{ number_format($sub, 2) }}</td>
+        <td class="t-right">
+          @if($impTotal > 0)
+            ${{ number_format($impTotal, 2) }}
+            @if($imp1Label || $imp2Label)
+              <div class="imp-label">
+                @if($imp1Label && $imp1 > 0){{ $imp1Label }}@endif
+                @if($imp1Label && $imp1 > 0 && $imp2Label && $imp2 > 0) + @endif
+                @if($imp2Label && $imp2 > 0){{ $imp2Label }}@endif
+              </div>
+            @endif
+          @else
+            <span class="t-muted">—</span>
+          @endif
+        </td>
+        <td class="t-right"><b>${{ number_format($totalItem, 2) }}</b></td>
       </tr>
     @empty
-      <tr><td colspan="7" class="t-center t-muted">Sin partidas</td></tr>
+      <tr><td colspan="9" class="t-center t-muted">Sin partidas</td></tr>
     @endforelse
   </table>
 
@@ -167,16 +197,31 @@
   <table class="w-100 mt-12">
     <tr>
       <td class="w-50">
-        @php $aplicaIva = data_get($requisicion, 'aplica_iva', true); @endphp
-        <div class="t-muted">IVA: {{ $aplicaIva ? number_format($ivaRate*100,0).'%' : 'No aplica' }}</div>
+        @if($requisicion->metodo_pago)
+          <div class="t-muted">Método de pago:
+            <b>{{ ucfirst($requisicion->metodo_pago) }}</b>
+          </div>
+        @endif
+        @if($requisicion->es_pago_factura)
+          <div class="t-muted" style="margin-top:4px">Tipo: <b>Pago de factura</b></div>
+        @endif
       </td>
       <td class="w-50">
         <table class="w-100 totals">
-          <tr><td class="label">Subtotal:</td><td class="t-right">${{ number_format($subtotal,2) }}</td></tr>
-          @if($iva>0)
-            <tr><td class="label">IVA:</td><td class="t-right">${{ number_format($iva,2) }}</td></tr>
+          <tr>
+            <td class="label">Subtotal:</td>
+            <td class="t-right">${{ number_format($subtotal, 2) }}</td>
+          </tr>
+          @if($iva > 0)
+          <tr>
+            <td class="label">Impuestos:</td>
+            <td class="t-right">${{ number_format($iva, 2) }}</td>
+          </tr>
           @endif
-          <tr><td class="label"><b>Total:</b></td><td class="t-right"><b>${{ number_format($total,2) }}</b></td></tr>
+          <tr>
+            <td class="label"><b>Total:</b></td>
+            <td class="t-right"><b>${{ number_format($total, 2) }}</b></td>
+          </tr>
         </table>
       </td>
     </tr>
@@ -198,7 +243,6 @@
       <td class="sign t-center" style="vertical-align:middle;">
         {{ $requisicion->solicitante->name ?? '-' }}
       </td>
-
       <td class="sign t-center" style="vertical-align:middle;">
         @if($jefe && !empty($jefe['firma']))
           <img src="{{ $jefe['firma'] }}" class="firma-img">
@@ -215,7 +259,6 @@
     <tr class="purple">
       <td colspan="2"><b>Autorizaciones por monto de compra</b></td>
     </tr>
-
     <tr style="height:85px;">
       <td class="t-center" style="vertical-align:middle;">
         @if($area && !empty($area['firma']))
@@ -234,14 +277,13 @@
         @endif
       </td>
     </tr>
-
     <tr class="thead">
-      <th class="t-center">Gerencia de Área (de $0.00 hasta $5,000.00)</th>
+      <th class="t-center">Gerente de Operaciones (de $0.00 hasta $5,000.00)</th>
       <th class="t-center">Gerencia Administrativa (de $5,001 a más)</th>
     </tr>
   </table>
 
-  <!-- ✅ Recepción -->
+  <!-- Recepción -->
   <table class="table mt-12">
     <tr class="thead">
       <th class="t-center">Fecha de Recibido</th>
@@ -249,14 +291,8 @@
       <th class="t-center">Firma de conformidad de recepción</th>
     </tr>
     <tr style="height:60px">
-      <td class="t-center" style="vertical-align:middle;">
-        {{ $fechaRec }}
-      </td>
-
-      <td class="t-center" style="vertical-align:middle;">
-        {{ $nombreAreaRec ?: '' }}
-      </td>
-
+      <td class="t-center" style="vertical-align:middle;">{{ $fechaRec }}</td>
+      <td class="t-center" style="vertical-align:middle;">{{ $nombreAreaRec ?: '—' }}</td>
       <td class="t-center" style="vertical-align:middle;">
         @if($firmaRecep)
           <img src="{{ $firmaRecep }}" class="firma-img">
@@ -266,6 +302,18 @@
         @else
           <span class="t-muted">—</span>
         @endif
+      </td>
+    </tr>
+  </table>
+
+  <!-- Leyendas -->
+  <table class="table mt-12">
+    <tr>
+      <td style="font-size:9px; color:#555; border:none; padding-top:8px;">
+        📅 <b>Plazo de entrega:</b> El plazo máximo de entrega de bienes o servicios es de <b>15 días naturales</b>
+        a partir de la colocación de la orden de compra, salvo casos especiales informados al solicitante.<br>
+        💰 <b>Programación de pagos:</b> Para que el pago se considere en la semana en curso,
+        la factura debe recibirse a más tardar el <b>lunes a las 12:00 pm</b>.
       </td>
     </tr>
   </table>

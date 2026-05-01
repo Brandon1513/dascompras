@@ -21,31 +21,33 @@ class RequisicionForm extends Component
 {
     use WithFileUploads;
 
-    public ?int  $requisicionId    = null;
-    public bool  $isEditing        = false;
+    public ?int   $requisicionId     = null;
+    public bool   $isEditing         = false;
     public string $fecha_emision;
-    public string $urgencia          = 'normal';
     public ?int   $departamento_id   = null;
     public ?int   $centro_costo_id   = null;
     public string $justificacion     = '';
     public string $solicitante_nombre = '';
     public bool   $es_pago_factura   = false;
+    public bool   $afecta_produccion = false;  // reemplaza el select de urgencia
     public string $estado_actual     = 'borrador';
 
-    public mixed   $factura_nueva    = null;
-    public ?string $factura_path     = null;
-    public ?string $factura_nombre   = null;
+    public mixed   $factura_nueva   = null;
+    public ?string $factura_path    = null;
+    public ?string $factura_nombre  = null;
 
-    public array $items            = [];
-    public array $archivos_nuevos  = [];
+    public array $items           = [];
+    public array $archivos_nuevos = [];
+    public mixed $archivo_temp        = null;
+    public ?int  $archivo_temp_index  = null;
 
-    public float $subtotal         = 0;
-    public float $total_impuestos  = 0;
-    public float $total            = 0;
+    public float $subtotal        = 0;
+    public float $total_impuestos = 0;
+    public float $total           = 0;
 
-    public array $departamentos    = [];
-    public array $unidades_medida  = [];
-    public array $tipos_impuesto   = [];
+    public array $departamentos   = [];
+    public array $unidades_medida = [];
+    public array $tipos_impuesto  = [];
 
     public function mount(?int $requisicionId = null): void
     {
@@ -75,8 +77,12 @@ class RequisicionForm extends Component
             $this->isEditing     = true;
             $this->requisicionId = $requisicionId;
 
-            $req = Requisicion::with(['items.archivos', 'items.unidadMedida', 'items.tipoImpuesto', 'items.tipoImpuesto2'])
-                ->findOrFail($requisicionId);
+            $req = Requisicion::with([
+                'items.archivos',
+                'items.unidadMedida',
+                'items.tipoImpuesto',
+                'items.tipoImpuesto2',
+            ])->findOrFail($requisicionId);
 
             $esCompras     = Auth::user()->hasAnyRole(['compras', 'administrador']);
             $esSolicitante = $req->solicitante_id === Auth::id();
@@ -87,18 +93,18 @@ class RequisicionForm extends Component
                 403
             );
 
-            $this->estado_actual   = $req->estado;
-            $this->fecha_emision   = $req->fecha_emision->toDateString();
-            $this->urgencia        = $req->urgencia;
-            $this->departamento_id = $req->departamento_id;
-            $this->centro_costo_id = $req->centro_costo_id;
-            $this->justificacion   = $req->justificacion;
-            $this->es_pago_factura = (bool) $req->es_pago_factura;
-            $this->factura_path    = $req->factura_path;
-            $this->factura_nombre  = $req->factura_nombre;
-            $this->subtotal        = (float) $req->subtotal;
-            $this->total_impuestos = 0;
-            $this->total           = (float) $req->total;
+            $this->estado_actual     = $req->estado;
+            $this->fecha_emision     = $req->fecha_emision->toDateString();
+            $this->departamento_id   = $req->departamento_id;
+            $this->centro_costo_id   = $req->centro_costo_id;
+            $this->justificacion     = $req->justificacion;
+            $this->es_pago_factura   = (bool) $req->es_pago_factura;
+            $this->afecta_produccion = $req->urgencia === 'urgente'; // cargar del campo urgencia
+            $this->factura_path      = $req->factura_path;
+            $this->factura_nombre    = $req->factura_nombre;
+            $this->subtotal          = (float) $req->subtotal;
+            $this->total_impuestos   = 0;
+            $this->total             = (float) $req->total;
 
             $this->items = $req->items->map(function ($it) {
                 return [
@@ -106,13 +112,13 @@ class RequisicionForm extends Component
                     'descripcion'          => $it->descripcion,
                     'unidad'               => $it->unidad,
                     'unidad_medida_id'     => $it->unidad_medida_id,
-                    'cantidad'             => (float) $it->cantidad,
+                    'cantidad'             => (int) $it->cantidad,
                     'precio_unitario'      => (float) $it->precio_unitario,
                     'subtotal'             => (float) $it->subtotal,
                     'tipo_impuesto_id'     => $it->tipo_impuesto_id,
                     'monto_impuesto'       => (float) $it->monto_impuesto,
                     'tipo_impuesto_id_2'   => $it->tipo_impuesto_id_2,
-                    'monto_impuesto_2'     => (float) $it->monto_impuesto_2,
+                    'monto_impuesto_2'     => (float) ($it->monto_impuesto_2 ?? 0),
                     'total_item'           => (float) $it->total_item,
                     'link_compra'          => $it->link_compra,
                     'proveedor_sugerido'   => $it->proveedor_sugerido,
@@ -173,6 +179,20 @@ class RequisicionForm extends Component
         $this->items[]           = $this->itemVacio();
         $this->archivos_nuevos[] = [];
     }
+    public function updatedArchivoTemp(): void
+    {
+        if (!$this->archivo_temp || $this->archivo_temp_index === null) return;
+        $i          = $this->archivo_temp_index;
+        $existentes = count($this->items[$i]['archivos_existentes'] ?? []);
+        $nuevos     = count($this->archivos_nuevos[$i] ?? []);
+        if (($existentes + $nuevos) >= 5) {
+            $this->addError("archivos_nuevos.$i", 'Límite de 5 archivos alcanzado.');
+            $this->archivo_temp = null; $this->archivo_temp_index = null;
+            return;
+        }
+        $this->archivos_nuevos[$i][] = $this->archivo_temp;
+        $this->archivo_temp = null; $this->archivo_temp_index = null;
+    }
 
     public function removeItem(int $index): void
     {
@@ -206,6 +226,19 @@ class RequisicionForm extends Component
         );
     }
 
+    /**
+     * Quitar un archivo nuevo de la cola antes de guardar (feedback visual).
+     */
+    public function removeArchivoNuevo(int $itemIndex, int $archivoIndex): void
+    {
+        if (isset($this->archivos_nuevos[$itemIndex][$archivoIndex])) {
+            unset($this->archivos_nuevos[$itemIndex][$archivoIndex]);
+            $this->archivos_nuevos[$itemIndex] = array_values(
+                $this->archivos_nuevos[$itemIndex]
+            );
+        }
+    }
+
     public function removeFactura(): void
     {
         if ($this->factura_path) {
@@ -224,7 +257,6 @@ class RequisicionForm extends Component
     }
 
     // ─── Recálculo reactivo ───────────────────────────────────────────────────
-    // Se dispara con wire:model.live en cantidad, precio e impuestos
 
     public function updatedItems(): void
     {
@@ -233,29 +265,27 @@ class RequisicionForm extends Component
 
     private function recalcularTotales(): void
     {
-        $subtotalGeneral  = 0;
-        $impuestoGeneral  = 0;
-        $impuestosMap     = collect($this->tipos_impuesto)->keyBy('id');
+        $subtotalGeneral = 0;
+        $impuestoGeneral = 0;
+        $impuestosMap    = collect($this->tipos_impuesto)->keyBy('id');
 
         foreach ($this->items as $i => $row) {
             $cant = (float) ($row['cantidad'] ?? 0);
             $pu   = (float) ($row['precio_unitario'] ?? 0);
             $sub  = round($cant * $pu, 2);
 
-            // Impuesto 1
-            $tipoId1  = $row['tipo_impuesto_id'] ?? null;
-            $pct1     = $tipoId1 ? (float) ($impuestosMap[$tipoId1]['porcentaje'] ?? 0) : 0;
-            $imp1     = round($sub * ($pct1 / 100), 2);
+            $tipoId1 = $row['tipo_impuesto_id'] ?? null;
+            $pct1    = $tipoId1 ? (float) ($impuestosMap[$tipoId1]['porcentaje'] ?? 0) : 0;
+            $imp1    = round($sub * ($pct1 / 100), 2);
 
-            // Impuesto 2 — sobre el subtotal, independiente del impuesto 1
-            $tipoId2  = $row['tipo_impuesto_id_2'] ?? null;
-            $pct2     = $tipoId2 ? (float) ($impuestosMap[$tipoId2]['porcentaje'] ?? 0) : 0;
-            $imp2     = round($sub * ($pct2 / 100), 2);
+            $tipoId2 = $row['tipo_impuesto_id_2'] ?? null;
+            $pct2    = $tipoId2 ? (float) ($impuestosMap[$tipoId2]['porcentaje'] ?? 0) : 0;
+            $imp2    = round($sub * ($pct2 / 100), 2);
 
-            $this->items[$i]['subtotal']        = $sub;
-            $this->items[$i]['monto_impuesto']  = $imp1;
+            $this->items[$i]['subtotal']         = $sub;
+            $this->items[$i]['monto_impuesto']   = $imp1;
             $this->items[$i]['monto_impuesto_2'] = $imp2;
-            $this->items[$i]['total_item']      = round($sub + $imp1 + $imp2, 2);
+            $this->items[$i]['total_item']       = round($sub + $imp1 + $imp2, 2);
 
             $subtotalGeneral += $sub;
             $impuestoGeneral += $imp1 + $imp2;
@@ -275,28 +305,31 @@ class RequisicionForm extends Component
             : ['nullable'];
 
         return [
-            'fecha_emision'               => ['required', 'date'],
-            'urgencia'                    => ['required', 'in:normal,urgente'],
-            'departamento_id'             => ['required', 'exists:departamentos,id'],
-            'centro_costo_id'             => ['required', 'exists:departamentos,id'],
-            'justificacion'               => ['required', 'string', 'min:5'],
-            'es_pago_factura'             => ['boolean'],
-            'factura_nueva'               => array_merge($facturaRules, ['file', 'max:10240', 'mimes:pdf,jpg,jpeg,png']),
+            'fecha_emision'              => ['required', 'date'],
+            'departamento_id'            => ['required', 'exists:departamentos,id'],
+            'centro_costo_id'            => ['required', 'exists:departamentos,id'],
+            'justificacion'              => ['required', 'string', 'min:5'],
+            'es_pago_factura'            => ['boolean'],
+            'afecta_produccion'          => ['boolean'],
+            'factura_nueva'              => array_merge(
+                $facturaRules,
+                ['file', 'max:10240', 'mimes:pdf,jpg,jpeg,png']
+            ),
 
-            'items'                       => ['required', 'array', 'min:1'],
-            'items.*.descripcion'         => ['required', 'string', 'min:2', 'max:255'],
-            'items.*.unidad_medida_id'    => ['nullable', 'exists:unidades_medida,id'],
-            'items.*.cantidad'            => ['required', 'integer', 'min:1'],
-            'items.*.precio_unitario'     => ['required', 'numeric', 'gte:0'],
-            'items.*.tipo_impuesto_id'    => ['nullable', 'exists:tipos_impuesto,id'],
-            'items.*.tipo_impuesto_id_2'  => ['nullable', 'exists:tipos_impuesto,id'],
-            'items.*.link_compra'         => ['nullable', 'string', 'max:500'],
-            'items.*.proveedor_sugerido'  => ['nullable', 'string', 'max:255'],
+            'items'                      => ['required', 'array', 'min:1'],
+            'items.*.descripcion'        => ['required', 'string', 'min:2', 'max:255'],
+            'items.*.unidad_medida_id'   => ['nullable', 'exists:unidades_medida,id'],
+            'items.*.cantidad'           => ['required', 'integer', 'min:1'],
+            'items.*.precio_unitario'    => ['required', 'numeric', 'gte:0'],
+            'items.*.tipo_impuesto_id'   => ['nullable', 'exists:tipos_impuesto,id'],
+            'items.*.tipo_impuesto_id_2' => ['nullable', 'exists:tipos_impuesto,id'],
+            'items.*.link_compra'        => ['nullable', 'string', 'max:2000'],  // aumentado de 500 a 2000
+            'items.*.proveedor_sugerido' => ['nullable', 'string', 'max:255'],
 
-            'archivos_nuevos'             => ['array'],
-            'archivos_nuevos.*'           => ['array', 'max:5'],
-            'archivos_nuevos.*.*'         => ['nullable', 'file', 'max:10240',
-                                              'mimes:pdf,jpg,jpeg,png,doc,docx,xls,xlsx'],
+            'archivos_nuevos'            => ['array'],
+            'archivos_nuevos.*'          => ['array', 'max:5'],
+            'archivos_nuevos.*.*'        => ['nullable', 'file', 'max:10240',
+                                             'mimes:pdf,jpg,jpeg,png,doc,docx,xls,xlsx'],
         ];
     }
 
@@ -400,7 +433,8 @@ class RequisicionForm extends Component
                 'departamento_id' => $this->departamento_id,
                 'centro_costo_id' => $this->centro_costo_id,
                 'justificacion'   => $this->justificacion,
-                'urgencia'        => $this->urgencia,
+                // urgencia se deriva del checkbox afecta_produccion
+                'urgencia'        => $this->afecta_produccion ? 'urgente' : 'normal',
                 'es_pago_factura' => $this->es_pago_factura,
                 'factura_path'    => $this->es_pago_factura ? $facturaPath : null,
                 'factura_nombre'  => $this->es_pago_factura ? $facturaNombre : null,
@@ -474,7 +508,7 @@ class RequisicionForm extends Component
             'descripcion'          => $row['descripcion'],
             'unidad'               => $row['unidad'] ?: null,
             'unidad_medida_id'     => $row['unidad_medida_id'] ?: null,
-            'cantidad'             => (float) $row['cantidad'],
+            'cantidad'             => (int) $row['cantidad'],
             'precio_unitario'      => (float) $row['precio_unitario'],
             'subtotal'             => (float) ($row['subtotal'] ?? 0),
             'tipo_impuesto_id'     => $row['tipo_impuesto_id'] ?: null,

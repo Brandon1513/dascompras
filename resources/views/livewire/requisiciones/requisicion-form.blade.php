@@ -49,22 +49,13 @@
         </div>
         <div class="p-5 space-y-4">
 
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <div>
                     <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Fecha de elaboración</label>
                     <input type="date" wire:model.live="fecha_emision"
                            class="w-full rounded-lg border-gray-200 text-sm shadow-sm focus:ring-purple-500 focus:border-purple-500
                                   @error('fecha_emision') border-red-400 @enderror">
                     @error('fecha_emision') <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
-                </div>
-
-                <div>
-                    <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Urgencia</label>
-                    <select wire:model.live="urgencia"
-                            class="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
-                        <option value="normal">Normal</option>
-                        <option value="urgente">🔴 Urgente</option>
-                    </select>
                 </div>
 
                 <div class="sm:col-span-2">
@@ -137,82 +128,95 @@
                 </div>
             </div>
 
-            {{-- Toggle pago de factura --}}
-            <div class="pt-1 space-y-4">
-                <div class="flex items-center gap-3">
-                    <label class="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" wire:model.live="es_pago_factura" class="sr-only peer">
-                        <div class="w-10 h-5 bg-gray-200 rounded-full peer peer-checked:bg-purple-600 transition-colors duration-200
-                                    after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full
-                                    after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-5"></div>
-                    </label>
+            {{-- Checkboxes: Afecta producción + Pago de factura --}}
+            <div class="pt-1 space-y-3">
+
+                {{-- Checkbox: Afecta proceso de producción --}}
+                <label class="flex items-start gap-3 p-3 rounded-xl border border-orange-100 bg-orange-50/50 cursor-pointer hover:bg-orange-50 transition-colors">
+                    <div class="flex items-center h-5 mt-0.5">
+                        <input type="checkbox" wire:model.live="afecta_produccion"
+                               class="w-4 h-4 text-orange-600 border-orange-300 rounded focus:ring-orange-500">
+                    </div>
+                    <div>
+                        <span class="text-sm font-semibold text-orange-800">⚠️ Afecta al proceso de producción</span>
+                        <p class="text-xs text-orange-600 mt-0.5">Márcalo si esta compra impacta directamente en la línea de producción.</p>
+                    </div>
+                </label>
+
+                {{-- Checkbox: Pago de factura --}}
+                <label class="flex items-start gap-3 p-3 rounded-xl border border-gray-100 bg-gray-50/50 cursor-pointer hover:bg-gray-50 transition-colors">
+                    <div class="flex items-center h-5 mt-0.5">
+                        <input type="checkbox" wire:model.live="es_pago_factura"
+                               class="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500">
+                    </div>
                     <div>
                         <span class="text-sm font-semibold text-gray-700">Es pago de factura</span>
-                        <p class="text-xs text-gray-400">Actívalo si es para pagar una factura existente. <strong class="text-gray-600">Se requiere adjuntar la factura.</strong></p>
+                        <p class="text-xs text-gray-400 mt-0.5">Actívalo si es para pagar una factura existente. <strong class="text-gray-600">Se requiere adjuntar la factura.</strong></p>
                     </div>
-                </div>
-
-                @if($es_pago_factura)
-                <div class="p-4 space-y-3 border-2 border-purple-300 border-dashed rounded-xl bg-purple-50/50">
-                    <div class="flex items-center gap-2">
-                        <svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                        </svg>
-                        <span class="text-sm font-bold text-purple-700">Factura adjunta <span class="text-red-500">*</span></span>
-                        <span class="text-xs text-purple-400">(PDF, JPG o PNG · máx. 10 MB)</span>
-                    </div>
-
-                    @if($factura_path)
-                        <div class="flex items-center justify-between p-3 bg-white border border-purple-200 rounded-xl">
-                            <div class="flex items-center min-w-0 gap-2">
-                                <span class="text-xl">📄</span>
-                                <div class="min-w-0">
-                                    <a href="{{ Storage::disk('public')->url($factura_path) }}" target="_blank"
-                                       class="block max-w-xs text-sm font-semibold text-purple-600 truncate hover:underline">
-                                        {{ $factura_nombre ?? 'Factura' }}
-                                    </a>
-                                    <p class="text-xs text-gray-400">Factura adjunta</p>
-                                </div>
-                            </div>
-                            <button type="button" wire:click="removeFactura"
-                                    wire:confirm="¿Eliminar la factura?"
-                                    class="ml-3 text-xs font-semibold text-red-500 hover:text-red-700 shrink-0">
-                                Eliminar
-                            </button>
-                        </div>
-                    @else
-                        <label class="flex items-center justify-center gap-3 p-4 transition-colors bg-white border border-purple-200 cursor-pointer rounded-xl hover:bg-purple-50">
-                            <svg class="w-6 h-6 text-purple-300" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
-                            </svg>
-                            <div class="text-center">
-                                <span class="text-sm font-semibold text-purple-600">Subir factura</span>
-                                <p class="text-xs text-purple-400 mt-0.5">PDF, JPG o PNG</p>
-                            </div>
-                            <input type="file" wire:model="factura_nueva" accept=".pdf,.jpg,.jpeg,.png" class="hidden">
-                        </label>
-                        <div wire:loading wire:target="factura_nueva" class="flex items-center gap-2 text-xs text-purple-500">
-                            <svg class="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                            </svg>
-                            Subiendo...
-                        </div>
-                        @if($factura_nueva)
-                        <div class="flex items-center gap-2 p-2 text-xs text-gray-500 bg-white border border-purple-100 rounded-lg">
-                            <span>📄</span>
-                            <span class="truncate">{{ $factura_nueva->getClientOriginalName() }}</span>
-                        </div>
-                        @endif
-                    @endif
-
-                    @error('factura_nueva')
-                        <div class="flex items-center gap-2 p-3 text-xs font-medium text-red-700 border border-red-200 rounded-lg bg-red-50">
-                            ⚠️ {{ $message }}
-                        </div>
-                    @enderror
-                </div>
-                @endif
+                </label>
             </div>
+
+            {{-- Zona de factura --}}
+            @if($es_pago_factura)
+            <div class="p-4 space-y-3 border-2 border-purple-300 border-dashed rounded-xl bg-purple-50/50">
+                <div class="flex items-center gap-2">
+                    <svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    <span class="text-sm font-bold text-purple-700">Factura adjunta <span class="text-red-500">*</span></span>
+                    <span class="text-xs text-purple-400">(PDF, JPG o PNG · máx. 10 MB)</span>
+                </div>
+
+                @if($factura_path)
+                    <div class="flex items-center justify-between p-3 bg-white border border-purple-200 rounded-xl">
+                        <div class="flex items-center min-w-0 gap-2">
+                            <span class="text-xl">📄</span>
+                            <div class="min-w-0">
+                                <a href="{{ Storage::disk('public')->url($factura_path) }}" target="_blank"
+                                   class="block max-w-xs text-sm font-semibold text-purple-600 truncate hover:underline">
+                                    {{ $factura_nombre ?? 'Factura' }}
+                                </a>
+                                <p class="text-xs text-gray-400">Factura adjunta</p>
+                            </div>
+                        </div>
+                        <button type="button" wire:click="removeFactura" wire:confirm="¿Eliminar la factura?"
+                                class="ml-3 text-xs font-semibold text-red-500 hover:text-red-700 shrink-0">
+                            Eliminar
+                        </button>
+                    </div>
+                @else
+                    <label class="flex items-center justify-center gap-3 p-4 transition-colors bg-white border border-purple-200 cursor-pointer rounded-xl hover:bg-purple-50">
+                        <svg class="w-6 h-6 text-purple-300" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                        </svg>
+                        <div class="text-center">
+                            <span class="text-sm font-semibold text-purple-600">Subir factura</span>
+                            <p class="text-xs text-purple-400 mt-0.5">PDF, JPG o PNG</p>
+                        </div>
+                        <input type="file" wire:model="factura_nueva" accept=".pdf,.jpg,.jpeg,.png" class="hidden">
+                    </label>
+                    <div wire:loading wire:target="factura_nueva" class="flex items-center gap-2 text-xs text-purple-500">
+                        <svg class="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                        Subiendo...
+                    </div>
+                    @if($factura_nueva)
+                    <div class="flex items-center gap-2 p-2 text-xs text-gray-500 bg-white border border-purple-100 rounded-lg">
+                        <span>📄</span>
+                        <span class="truncate">{{ $factura_nueva->getClientOriginalName() }}</span>
+                    </div>
+                    @endif
+                @endif
+
+                @error('factura_nueva')
+                    <div class="flex items-center gap-2 p-3 text-xs font-medium text-red-700 border border-red-200 rounded-lg bg-red-50">
+                        ⚠️ {{ $message }}
+                    </div>
+                @enderror
+            </div>
+            @endif
+
         </div>
     </div>
 
@@ -249,7 +253,7 @@
                     @endif
                 </div>
 
-                {{-- Fila 1: Descripción + Cantidad + Unidad + Precio --}}
+                {{-- Fila 1 --}}
                 <div class="grid grid-cols-12 gap-3">
                     <div class="col-span-12 sm:col-span-5">
                         <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
@@ -265,8 +269,8 @@
                     <div class="col-span-4 sm:col-span-2">
                         <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Cantidad</label>
                         <input type="number" step="1" min="1"
-                                 wire:model.live="items.{{ $i }}.cantidad"
-                                    class="w-full text-sm text-right border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                               wire:model.live="items.{{ $i }}.cantidad"
+                               class="w-full text-sm text-right border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
                     </div>
 
                     <div class="col-span-8 sm:col-span-3">
@@ -291,10 +295,8 @@
                     </div>
                 </div>
 
-                {{-- Fila 2: Impuestos + Proveedor + Link + Mini total --}}
+                {{-- Fila 2 --}}
                 <div class="grid grid-cols-12 gap-3">
-
-                    {{-- Impuesto 1 --}}
                     <div class="col-span-12 sm:col-span-3">
                         <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Impuesto 1</label>
                         <select wire:model.live="items.{{ $i }}.tipo_impuesto_id"
@@ -306,11 +308,9 @@
                         </select>
                     </div>
 
-                    {{-- Impuesto 2 (opcional) --}}
                     <div class="col-span-12 sm:col-span-3">
                         <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                            Impuesto 2
-                            <span class="ml-1 font-normal text-gray-300 normal-case">(opcional)</span>
+                            Impuesto 2 <span class="ml-1 font-normal text-gray-300 normal-case">(opcional)</span>
                         </label>
                         <select wire:model.live="items.{{ $i }}.tipo_impuesto_id_2"
                                 class="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
@@ -321,7 +321,6 @@
                         </select>
                     </div>
 
-                    {{-- Proveedor --}}
                     <div class="col-span-12 sm:col-span-4">
                         <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Proveedor sugerido</label>
                         <input type="text" wire:model.live="items.{{ $i }}.proveedor_sugerido"
@@ -329,7 +328,6 @@
                                class="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
                     </div>
 
-                    {{-- Mini totales --}}
                     <div class="flex flex-col justify-end col-span-12 sm:col-span-2">
                         <div class="px-3 py-2 space-y-1 text-xs border border-purple-100 rounded-xl bg-purple-50/50">
                             <div class="flex justify-between text-gray-400">
@@ -356,33 +354,38 @@
                     </div>
                 </div>
 
-                {{-- Link de referencia en su propia fila --}}
+                {{-- Link --}}
                 <div class="grid grid-cols-12 gap-3">
-                    <div class="col-span-12 sm:col-span-6">
+                    <div class="col-span-12 sm:col-span-8">
                         <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Link de referencia</label>
-                        <input type="url" wire:model.live="items.{{ $i }}.link_compra"
-                               placeholder="https://..."
+                        {{-- Cambiado a type="text" para soportar URLs largas --}}
+                        <input type="text" wire:model.live="items.{{ $i }}.link_compra"
+                               placeholder="https://... (pega aquí el link del producto)"
                                class="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
                     </div>
                 </div>
 
-                {{-- Archivos --}}
+             {{-- Archivos --}}
                 <div>
                     <label class="block mb-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                         Archivos adjuntos
                         <span class="font-normal text-gray-300 normal-case">(fichas técnicas, cotizaciones — máx. 5)</span>
                     </label>
-
+                
+                    {{-- Archivos ya guardados en BD --}}
                     @if(!empty($row['archivos_existentes']))
                     <div class="flex flex-wrap gap-2 mb-2">
                         @foreach($row['archivos_existentes'] as $arch)
-                        <div class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-gray-200 bg-gray-50 text-xs">
+                        <div class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-gray-200 bg-gray-50 text-xs group">
                             <span>{{ $arch['icono'] ?? '📎' }}</span>
-                            <a href="{{ $arch['url'] }}" target="_blank" class="text-indigo-500 hover:underline max-w-[140px] truncate">
+                            <a href="{{ $arch['url'] }}" target="_blank"
+                            class="text-indigo-500 hover:underline max-w-[140px] truncate">
                                 {{ $arch['nombre_original'] }}
                             </a>
-                            <button type="button" wire:click="removeArchivoExistente({{ $i }}, {{ $arch['id'] }})"
-                                    class="ml-1 text-gray-300 transition-colors hover:text-red-500">
+                            <button type="button"
+                                    wire:click="removeArchivoExistente({{ $i }}, {{ $arch['id'] }})"
+                                    class="ml-1 text-gray-300 transition-colors hover:text-red-500"
+                                    title="Eliminar">
                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
                                 </svg>
@@ -391,37 +394,86 @@
                         @endforeach
                     </div>
                     @endif
-
+                
+                    {{-- Archivo heredado histórico --}}
                     @if(!empty($row['ficha_tecnica_path']) && empty($row['archivos_existentes']))
                     <div class="mb-2">
                         <a href="{{ Storage::disk('public')->url($row['ficha_tecnica_path']) }}" target="_blank"
-                           class="inline-flex items-center gap-1 text-xs text-indigo-500 hover:underline">
+                        class="inline-flex items-center gap-1 text-xs text-indigo-500 hover:underline">
                             📄 {{ $row['ficha_tecnica_nombre'] ?? 'Ficha técnica' }}
                             <span class="text-gray-300">(anterior)</span>
                         </a>
                     </div>
                     @endif
-
-                    @php $totalArch = count($row['archivos_existentes'] ?? []); @endphp
+                
+                    {{-- Archivos nuevos en cola (acumulados, con X para quitar) --}}
+                    @if(!empty($archivos_nuevos[$i]))
+                    <div class="flex flex-wrap gap-2 mb-2">
+                        @foreach($archivos_nuevos[$i] as $j => $nuevoArch)
+                        @if($nuevoArch)
+                        <div class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50 text-xs">
+                            <span>📎</span>
+                            <span class="text-emerald-700 max-w-[140px] truncate font-medium">
+                                {{ $nuevoArch->getClientOriginalName() }}
+                            </span>
+                            <span class="text-emerald-400 shrink-0 text-[10px]">
+                                ({{ round($nuevoArch->getSize() / 1024, 0) }} KB)
+                            </span>
+                            <button type="button"
+                                    wire:click="removeArchivoNuevo({{ $i }}, {{ $j }})"
+                                    class="ml-1 text-emerald-400 hover:text-red-500 transition-colors"
+                                    title="Quitar">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                            </button>
+                        </div>
+                        @endif
+                        @endforeach
+                    </div>
+                    @endif
+                
+                    {{-- Botón adjuntar — un archivo a la vez para acumular correctamente --}}
+                    @php
+                        $totalArch = count($row['archivos_existentes'] ?? [])
+                                + count(array_filter($archivos_nuevos[$i] ?? []));
+                    @endphp
+                
                     @if($totalArch < 5)
-                    <label class="inline-flex items-center gap-2 px-3 py-2 text-xs text-gray-500 transition-colors border border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
-                        <svg class="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
-                        </svg>
-                        Adjuntar archivo
-                        <input type="file" multiple wire:model="archivos_nuevos.{{ $i }}"
-                               accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx" class="hidden">
-                    </label>
-                    <div wire:loading wire:target="archivos_nuevos.{{ $i }}" class="inline-flex items-center gap-1 ml-2 text-xs text-purple-500">
-                        <svg class="w-3 h-3 animate-spin" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                        </svg>
-                        Subiendo...
+                    <div class="flex items-center gap-2">
+                        <label class="inline-flex items-center gap-2 px-3 py-2 text-xs text-gray-500 transition-colors border border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
+                            <svg class="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
+                            </svg>
+                            Adjuntar archivo
+                            @if($totalArch > 0)
+                                <span class="text-gray-400">({{ $totalArch }}/5)</span>
+                            @endif
+                            {{-- Un archivo a la vez: sin multiple, con wire:model para acumular --}}
+                            <input type="file"
+                                wire:model="archivo_temp"
+                                wire:change="$set('archivo_temp_index', {{ $i }})"
+                                accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
+                                class="hidden">
+                        </label>
+                
+                        <div wire:loading wire:target="archivo_temp"
+                            class="inline-flex items-center gap-1 text-xs text-purple-500">
+                            <svg class="w-3 h-3 animate-spin" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                            </svg>
+                            Subiendo...
+                        </div>
                     </div>
                     @else
                     <p class="text-xs text-amber-500">⚠️ Límite de 5 archivos alcanzado</p>
                     @endif
+                
+                    @error("archivos_nuevos.$i")
+                        <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                    @enderror
                 </div>
+                
 
             </div>
             @endforeach

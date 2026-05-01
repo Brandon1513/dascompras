@@ -26,6 +26,7 @@ class RequisicionController extends Controller
                 'solicitante',
                 'departamentoRef',
                 'centroCostoRef',
+                'items',
                 'aprobaciones.nivel',
                 'aprobaciones.aprobador',
             ])
@@ -142,72 +143,72 @@ class RequisicionController extends Controller
             ->with('status', 'Recepción registrada correctamente.');
     }
 
-    public function pdf(Requisicion $requisicion)
+        public function pdf(Requisicion $requisicion)
     {
         $this->authorize('view', $requisicion);
-
+ 
+        // Permitir PDF cuando está aprobada, pendiente de cierre o recibida
         abort_unless(
-            in_array($requisicion->estado, ['aprobada_final','recibida'], true),
+            in_array($requisicion->estado, ['aprobada_final', 'pendiente_cierre', 'recibida'], true),
             403,
             'No se puede generar PDF de una requisición que no ha sido aprobada.'
         );
-
+ 
         $requisicion->load([
             'solicitante:id,name',
             'departamentoRef:id,nombre',
             'centroCostoRef:id,nombre',
-            'items' => fn ($q) => $q->orderBy('id'),
+            'items'               => fn($q) => $q->orderBy('id'),
+            'items.unidadMedida',          // ← nuevo: unidad del catálogo
+            'items.tipoImpuesto',          // ← impuesto 1
+            'items.tipoImpuesto2',         // ← impuesto 2
             'aprobaciones.nivel',
             'aprobaciones.aprobador',
         ]);
-
-        // ✅ Firmas de aprobaciones (firma_path -> data uri)
+ 
+        // Firmas de aprobaciones → data URI
         $requisicion->aprobaciones->each(function ($ap) {
             $ap->firma_data_uri = null;
-
             if (!empty($ap->firma_path)) {
                 $full = Storage::disk('public')->path($ap->firma_path);
                 if (is_file($full)) {
-                    $ap->firma_data_uri = 'data:image/png;base64,' . base64_encode(file_get_contents($full));
+                    $ap->firma_data_uri = 'data:image/png;base64,'
+                        . base64_encode(file_get_contents($full));
                 }
             }
         });
-
-        // ✅ Firma de recepción (firma_recepcion_path -> base64)
+ 
+        // Firma de recepción → base64
         $firmaRecepcionBase64 = null;
         if (!empty($requisicion->firma_recepcion_path)) {
             $full = Storage::disk('public')->path($requisicion->firma_recepcion_path);
             if (is_file($full)) {
-                $firmaRecepcionBase64 = 'data:image/png;base64,' . base64_encode(file_get_contents($full));
+                $firmaRecepcionBase64 = 'data:image/png;base64,'
+                    . base64_encode(file_get_contents($full));
             }
         }
-
-        $ivaRate = 0.16;
-
-        $subtotalItems = $requisicion->items->sum(function ($it) {
-            if (!is_null($it->subtotal)) return (float) $it->subtotal;
-            $cant = (float) ($it->cantidad ?? 0);
-            $pu   = (float) ($it->precio_unitario ?? 0);
-            return $cant * $pu;
-        });
-
-        $subtotal = !is_null($requisicion->subtotal) ? (float) $requisicion->subtotal : round($subtotalItems, 2);
-
-        $aplicaIva = data_get($requisicion, 'aplica_iva', true);
-        $iva   = !is_null($requisicion->iva) ? (float) $requisicion->iva : ($aplicaIva ? round($subtotal * $ivaRate, 2) : 0);
-        $total = !is_null($requisicion->total) ? (float) $requisicion->total : round($subtotal + $iva, 2);
-
-        //Logo de la empresa
+ 
+        // Totales (usa los campos guardados en BD, no recalcula)
+        $subtotal = (float) ($requisicion->subtotal ?? 0);
+        $iva      = (float) ($requisicion->iva      ?? 0);
+        $total    = (float) ($requisicion->total    ?? 0);
+        $ivaRate  = 0.16; // solo para compatibilidad con la vista
+ 
+        // Logo
         $logoBase64 = null;
-        $logoPath = public_path('images/logo.png');
-        $logoBase64 = file_exists($logoPath)
-            ? 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath))
-            : null;
-
+        $logoPath   = public_path('images/logo.png');
+        if (file_exists($logoPath)) {
+            $logoBase64 = 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath));
+        }
+ 
         return Pdf::loadView('requisiciones.pdf', compact(
-                'requisicion','subtotal','iva','total','ivaRate','logoBase64','firmaRecepcionBase64'
+                'requisicion',
+                'subtotal', 'iva', 'total', 'ivaRate',
+                'logoBase64',
+                'firmaRecepcionBase64'
             ))
             ->setPaper('a4', 'portrait')
             ->stream("REQ-{$requisicion->folio}.pdf");
     }
+
 }

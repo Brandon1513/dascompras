@@ -3,7 +3,7 @@
         <div class="flex items-center justify-between">
             <div class="flex items-center gap-3">
                 <a href="{{ route('requisiciones.index') }}"
-                   class="flex items-center justify-center w-8 h-8 text-gray-500 transition bg-gray-100 rounded-lg hover:bg-gray-200">
+                   class="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200 transition">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
                     </svg>
@@ -17,8 +17,8 @@
                             </span>
                         @endif
                         @if($requisicion->urgencia === 'urgente')
-                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-red-100 text-red-700">
-                                🔴 Urgente
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-orange-100 text-orange-700">
+                                ⚠️ Afecta producción
                             </span>
                         @endif
                     </div>
@@ -84,7 +84,7 @@
             {{-- ══ BANNERS DE ESTADO ════════════════════════════════════ --}}
 
             {{-- Leyenda responsabilidad --}}
-            <div class="flex items-start gap-3 px-4 py-3 border rounded-xl border-amber-200/80 bg-amber-50/80 backdrop-blur-sm">
+            <div class="flex items-start gap-3 px-4 py-3 rounded-xl border border-amber-200/80 bg-amber-50/80 backdrop-blur-sm">
                 <svg class="w-4 h-4 text-amber-500 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                     <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
                 </svg>
@@ -95,16 +95,16 @@
 
             {{-- Rechazada por compras --}}
             @if($requisicion->estado === 'rechazada_compras')
-                <div class="overflow-hidden border border-orange-200 rounded-xl bg-orange-50">
+                <div class="rounded-xl border border-orange-200 bg-orange-50 overflow-hidden">
                     <div class="flex items-center gap-2 px-4 py-2 bg-orange-100 border-b border-orange-200">
                         <span class="text-sm">↩️</span>
-                        <span class="text-xs font-bold tracking-wider text-orange-800 uppercase">Requiere correcciones — Compras</span>
+                        <span class="text-xs font-bold text-orange-800 uppercase tracking-wider">Requiere correcciones — Compras</span>
                     </div>
                     <div class="px-4 py-3">
                         @if($requisicion->motivo_rechazo_compras)
                             <p class="text-sm text-orange-700 whitespace-pre-line">{{ $requisicion->motivo_rechazo_compras }}</p>
                         @endif
-                        <p class="mt-2 text-xs text-orange-500">
+                        <p class="text-xs text-orange-500 mt-2">
                             Revisado por {{ $requisicion->revisadoPor?->name ?? '—' }}
                             @if($requisicion->revisado_en)· {{ $requisicion->revisado_en->format('d/m/Y H:i') }}@endif
                         </p>
@@ -120,8 +120,8 @@
 
             {{-- En revisión --}}
             @if($requisicion->estado === 'en_revision_compras')
-                <div class="flex items-center gap-3 px-4 py-3 border rounded-xl border-violet-200 bg-violet-50">
-                    <div class="flex items-center justify-center rounded-full w-7 h-7 bg-violet-100 shrink-0">
+                <div class="flex items-center gap-3 px-4 py-3 rounded-xl border border-violet-200 bg-violet-50">
+                    <div class="flex items-center justify-center w-7 h-7 rounded-full bg-violet-100 shrink-0">
                         <svg class="w-4 h-4 text-violet-600 animate-pulse" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
@@ -135,9 +135,9 @@
 
             {{-- Pendiente de cierre --}}
             @if($requisicion->estado === 'pendiente_cierre')
-                <div class="flex items-center justify-between px-4 py-3 border rounded-xl border-cyan-200 bg-cyan-50">
+                <div class="flex items-center justify-between px-4 py-3 rounded-xl border border-cyan-200 bg-cyan-50">
                     <div class="flex items-center gap-3">
-                        <div class="flex items-center justify-center rounded-full w-7 h-7 bg-cyan-100 shrink-0">
+                        <div class="flex items-center justify-center w-7 h-7 rounded-full bg-cyan-100 shrink-0">
                             <svg class="w-4 h-4 text-cyan-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                             </svg>
@@ -157,13 +157,13 @@
             @endif
 
             {{-- ══ DATOS GENERALES ════════════════════════════════════ --}}
-            <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-xl">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <div class="flex items-center gap-2 px-5 py-3 border-b border-gray-100"
                      style="background: linear-gradient(90deg, #4A1660 0%, #6d28d9 100%);">
                     <svg class="w-4 h-4 text-white/70" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                     </svg>
-                    <h3 class="text-xs font-bold tracking-widest text-white uppercase">Datos generales</h3>
+                    <h3 class="text-xs font-bold text-white uppercase tracking-widest">Datos generales</h3>
                 </div>
                 <div class="p-5">
                     <dl class="grid grid-cols-2 gap-5 text-sm md:grid-cols-4">
@@ -189,7 +189,7 @@
                                 @if($requisicion->es_pago_factura)
                                     <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-violet-100 text-violet-700">Pago de factura</span>
                                 @else
-                                    <span class="text-sm text-gray-600">Requisición de compra</span>
+                                    <span class="text-gray-600 text-sm">Requisición de compra</span>
                                 @endif
                             </dd>
                         </div>
@@ -207,7 +207,7 @@
                                         {{ ucfirst($requisicion->metodo_pago) }}
                                     </span>
                                 @else
-                                    <span class="text-xs text-gray-400">Sin asignar</span>
+                                    <span class="text-gray-400 text-xs">Sin asignar</span>
                                 @endif
                             </dd>
                         </div>
@@ -215,54 +215,56 @@
                     </dl>
 
                     @if($requisicion->justificacion)
-                    <div class="pt-4 mt-4 border-t border-gray-100">
+                    <div class="mt-4 pt-4 border-t border-gray-100">
                         <dt class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Justificación</dt>
-                        <dd class="px-4 py-3 text-sm leading-relaxed text-gray-700 whitespace-pre-line border border-gray-100 rounded-lg bg-gray-50">{{ $requisicion->justificacion }}</dd>
+                        <dd class="text-sm text-gray-700 whitespace-pre-line leading-relaxed bg-gray-50 rounded-lg px-4 py-3 border border-gray-100">{{ $requisicion->justificacion }}</dd>
                     </div>
                     @endif
                 </div>
             </div>
 
             {{-- ══ LEYENDAS INFORMATIVAS ══════════════════════════════ --}}
-            <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <div class="flex items-start gap-3 p-3 border border-indigo-100 rounded-xl bg-indigo-50/50">
-                    <span class="text-lg shrink-0">📅</span>
-                    <div>
-                        <p class="text-xs font-semibold text-indigo-800">Plazo de entrega</p>
-                        <p class="text-xs text-indigo-600 mt-0.5">El plazo máximo de entrega de bienes o servicios es de <strong>15 días naturales</strong> a partir de la colocación de la orden de compra, salvo casos especiales informados al solicitante.</p>
-                    </div>
+            <div class="flex flex-wrap gap-x-8 gap-y-2 px-1">
+                <div class="flex items-start gap-2">
+                    <span class="text-sm shrink-0 mt-0.5">📅</span>
+                    <p class="text-xs leading-relaxed text-gray-500">
+                        <span class="font-semibold text-gray-700">Plazo de entrega:</span>
+                        El plazo máximo es de <strong class="text-gray-700">15 días naturales</strong>
+                        a partir de la orden de compra, salvo casos especiales informados al solicitante.
+                    </p>
                 </div>
-                <div class="flex items-start gap-3 p-3 border rounded-xl border-emerald-100 bg-emerald-50/50">
-                    <span class="text-lg shrink-0">💰</span>
-                    <div>
-                        <p class="text-xs font-semibold text-emerald-800">Programación de pagos</p>
-                        <p class="text-xs text-emerald-600 mt-0.5">Para que el pago se considere en la semana en curso, la factura debe recibirse a más tardar el <strong>lunes a las 12:00 pm</strong>.</p>
-                    </div>
+                <div class="flex items-start gap-2">
+                    <span class="text-sm shrink-0 mt-0.5">💰</span>
+                    <p class="text-xs leading-relaxed text-gray-500">
+                        <span class="font-semibold text-gray-700">Programación de pagos:</span>
+                        Para que el pago aplique en la semana en curso, la factura debe recibirse a más tardar el
+                        <strong class="text-gray-700">lunes a las 12:00 pm</strong>.
+                    </p>
                 </div>
             </div>
 
             {{-- ══ FACTURA ADJUNTA ═════════════════════════════════════ --}}
             @if($requisicion->es_pago_factura)
-            <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-xl">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <div class="flex items-center gap-2 px-5 py-3 border-b border-gray-100 bg-violet-50">
                     <span>📄</span>
-                    <h3 class="text-xs font-bold tracking-widest uppercase text-violet-700">Factura adjunta</h3>
+                    <h3 class="text-xs font-bold text-violet-700 uppercase tracking-widest">Factura adjunta</h3>
                 </div>
                 <div class="p-5">
                     @if($requisicion->factura_path)
                         <a href="{{ Storage::disk('public')->url($requisicion->factura_path) }}" target="_blank"
-                           class="inline-flex items-center gap-3 px-4 py-3 transition border bg-violet-50 border-violet-200 rounded-xl hover:bg-violet-100 group">
+                           class="inline-flex items-center gap-3 px-4 py-3 bg-violet-50 border border-violet-200 rounded-xl hover:bg-violet-100 transition group">
                             <span class="text-2xl">📄</span>
                             <div>
                                 <p class="text-sm font-semibold text-violet-700 group-hover:underline">{{ $requisicion->factura_nombre ?? 'Ver factura' }}</p>
                                 <p class="text-xs text-violet-400">Clic para abrir el archivo</p>
                             </div>
-                            <svg class="w-4 h-4 ml-2 text-violet-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <svg class="w-4 h-4 text-violet-400 ml-2" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
                             </svg>
                         </a>
                     @else
-                        <p class="flex items-center gap-2 text-sm text-red-500">
+                        <p class="text-sm text-red-500 flex items-center gap-2">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                             </svg>
@@ -276,11 +278,11 @@
             {{-- ══ OBSERVACIONES DE COMPRAS ════════════════════════════ --}}
             @role('administrador|compras')
             @if($requisicion->observaciones_compras || $requisicion->revisadoPor)
-            <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-xl">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <div class="flex items-center justify-between px-5 py-3 border-b border-gray-100 bg-violet-50">
                     <div class="flex items-center gap-2">
                         <span>💬</span>
-                        <h3 class="text-xs font-bold tracking-widest uppercase text-violet-700">Observaciones de Compras</h3>
+                        <h3 class="text-xs font-bold text-violet-700 uppercase tracking-widest">Observaciones de Compras</h3>
                     </div>
                     @if($requisicion->puedeEditarCompras())
                     <a href="{{ route('requisiciones.revisar', $requisicion) }}" class="text-xs text-violet-600 hover:underline">Editar →</a>
@@ -288,7 +290,7 @@
                 </div>
                 <div class="p-5">
                     @if($requisicion->observaciones_compras)
-                        <p class="text-sm leading-relaxed text-gray-700 whitespace-pre-line">{{ $requisicion->observaciones_compras }}</p>
+                        <p class="text-sm text-gray-700 whitespace-pre-line leading-relaxed">{{ $requisicion->observaciones_compras }}</p>
                     @else
                         <p class="text-sm italic text-gray-400">Sin observaciones registradas.</p>
                     @endif
@@ -304,18 +306,18 @@
             @endrole
 
             {{-- ══ PARTIDAS ════════════════════════════════════════════ --}}
-            <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-xl">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <div class="flex items-center gap-2 px-5 py-3 border-b border-gray-100"
                      style="background: linear-gradient(90deg, #4A1660 0%, #6d28d9 100%);">
                     <svg class="w-4 h-4 text-white/70" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
                     </svg>
-                    <h3 class="text-xs font-bold tracking-widest text-white uppercase">Partidas</h3>
+                    <h3 class="text-xs font-bold text-white uppercase tracking-widest">Partidas</h3>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="min-w-full text-sm">
                         <thead>
-                            <tr class="border-b border-gray-100 bg-gray-50">
+                            <tr class="bg-gray-50 border-b border-gray-100">
                                 <th class="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">Cant.</th>
                                 <th class="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">Descripción</th>
                                 <th class="px-4 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">Unidad</th>
@@ -329,8 +331,8 @@
                         </thead>
                         <tbody class="divide-y divide-gray-50">
                             @forelse($requisicion->items as $it)
-                                <tr class="transition-colors hover:bg-purple-50/30">
-                                    <td class="px-4 py-3 text-xs text-gray-500">
+                                <tr class="hover:bg-purple-50/30 transition-colors">
+                                    <td class="px-4 py-3 text-gray-500 text-xs">
                                         {{ rtrim(rtrim(number_format($it->cantidad, 3, '.', ''), '0'), '.') }}
                                     </td>
                                     <td class="px-4 py-3">
@@ -343,8 +345,8 @@
                                             </a>
                                         @endif
                                     </td>
-                                    <td class="px-4 py-3 text-xs text-gray-500">{{ $it->unidad_label }}</td>
-                                    <td class="px-4 py-3 text-xs text-gray-600">{{ $it->proveedor_sugerido ?: '—' }}</td>
+                                    <td class="px-4 py-3 text-gray-500 text-xs">{{ $it->unidad_label }}</td>
+                                    <td class="px-4 py-3 text-gray-600 text-xs">{{ $it->proveedor_sugerido ?: '—' }}</td>
                                     <td class="px-4 py-3">
                                         <div class="flex flex-col gap-1">
                                             @foreach($it->archivos as $arch)
@@ -361,26 +363,26 @@
                                                 </a>
                                             @endif
                                             @if($it->archivos->isEmpty() && !$it->ficha_tecnica_path)
-                                                <span class="text-xs text-gray-300">—</span>
+                                                <span class="text-gray-300 text-xs">—</span>
                                             @endif
                                         </div>
                                     </td>
-                                    <td class="px-4 py-3 text-xs text-right text-gray-600">${{ number_format($it->precio_unitario, 2) }}</td>
-                                    <td class="px-4 py-3 text-xs text-right text-gray-600">${{ number_format($it->subtotal, 2) }}</td>
+                                    <td class="px-4 py-3 text-right text-gray-600 text-xs">${{ number_format($it->precio_unitario, 2) }}</td>
+                                    <td class="px-4 py-3 text-right text-gray-600 text-xs">${{ number_format($it->subtotal, 2) }}</td>
                                     <td class="px-4 py-3 text-right">
                                         @if($it->tipoImpuesto)
                                             <div class="text-xs text-gray-600">${{ number_format($it->monto_impuesto, 2) }}</div>
                                             <div class="text-[10px] text-gray-400">{{ $it->tipoImpuesto->nombre }}</div>
                                         @else
-                                            <span class="text-xs text-gray-300">—</span>
+                                            <span class="text-gray-300 text-xs">—</span>
                                         @endif
                                     </td>
-                                    <td class="px-4 py-3 text-sm font-bold text-right text-gray-800">
+                                    <td class="px-4 py-3 text-right font-bold text-gray-800 text-sm">
                                         ${{ number_format($it->total_item ?: $it->subtotal, 2) }}
                                     </td>
                                 </tr>
                             @empty
-                                <tr><td colspan="9" class="px-4 py-8 text-sm text-center text-gray-400">Sin partidas registradas.</td></tr>
+                                <tr><td colspan="9" class="px-4 py-8 text-center text-gray-400 text-sm">Sin partidas registradas.</td></tr>
                             @endforelse
                         </tbody>
                     </table>
@@ -405,17 +407,17 @@
             </div>
 
             {{-- ══ CADENA DE APROBACIONES ══════════════════════════════ --}}
-            <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-xl">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <div class="flex items-center gap-2 px-5 py-3 border-b border-gray-100"
                      style="background: linear-gradient(90deg, #4A1660 0%, #6d28d9 100%);">
                     <svg class="w-4 h-4 text-white/70" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
                     </svg>
-                    <h3 class="text-xs font-bold tracking-widest text-white uppercase">Cadena de aprobaciones</h3>
+                    <h3 class="text-xs font-bold text-white uppercase tracking-widest">Cadena de aprobaciones</h3>
                 </div>
                 <div class="p-5">
                     @if($requisicion->aprobaciones->isEmpty())
-                        <p class="py-4 text-sm text-center text-gray-400">Sin registros de aprobación aún.</p>
+                        <p class="text-sm text-gray-400 text-center py-4">Sin registros de aprobación aún.</p>
                     @else
                     <div class="relative">
                         {{-- Línea conectora --}}
@@ -425,7 +427,7 @@
 
                         <ul class="space-y-4">
                             @foreach($requisicion->aprobaciones->sortBy(fn($a) => $a->nivel?->orden ?? 999) as $ap)
-                                <li class="relative flex items-start gap-4">
+                                <li class="flex items-start gap-4 relative">
                                     {{-- Indicador --}}
                                     <div @class([
                                         'flex items-center justify-center w-7 h-7 rounded-full shrink-0 z-10 border-2',
@@ -442,7 +444,7 @@
                                         @endif
                                     </div>
 
-                                    <div class="flex items-start justify-between flex-1 min-w-0 gap-4">
+                                    <div class="flex-1 flex items-start justify-between gap-4 min-w-0">
                                         <div class="min-w-0">
                                             <p class="text-sm font-semibold text-gray-800">{{ $ap->nivel?->nombre ?? '—' }}</p>
                                             <p class="text-xs text-gray-500 mt-0.5">
@@ -480,7 +482,7 @@
                 @if($requisicion->estado === 'aprobada_final')
                     <div class="flex justify-end">
                         <a href="{{ route('requisiciones.recibir', $requisicion) }}"
-                           class="inline-flex items-center gap-2 px-6 py-3 text-sm font-semibold text-white transition-all shadow-lg rounded-xl hover:shadow-xl"
+                           class="inline-flex items-center gap-2 px-6 py-3 text-sm font-semibold text-white rounded-xl shadow-lg hover:shadow-xl transition-all"
                            style="background: linear-gradient(135deg, #059669, #047857);">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>

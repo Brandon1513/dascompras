@@ -30,7 +30,6 @@
     <div class="min-h-screen py-6" style="background: linear-gradient(160deg, #f8f5ff 0%, #f1f5f9 50%, #f8f5ff 100%);">
         <div class="px-4 mx-auto space-y-4 max-w-7xl sm:px-6 lg:px-8">
 
-            {{-- Flash --}}
             @if (session('status'))
                 <div class="flex items-center gap-2 p-4 text-sm font-medium border shadow-sm text-emerald-800 border-emerald-200 rounded-xl bg-emerald-50">
                     <svg class="w-4 h-4 shrink-0 text-emerald-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -50,11 +49,9 @@
                 </div>
                 <div class="p-4">
                     <form method="GET" class="grid items-end grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-6">
-
                         <div class="col-span-2 md:col-span-1">
                             <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Estado</label>
-                            <select name="estado"
-                                    class="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                            <select name="estado" class="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
                                 <option value="">Todos</option>
                                 @foreach([
                                     'borrador'            => 'Borrador',
@@ -76,8 +73,7 @@
                         @role('administrador|compras|gerente_operaciones|gerencia_adm|jefe')
                         <div class="col-span-2 md:col-span-1">
                             <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Solicitante</label>
-                            <select name="solicitante"
-                                    class="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                            <select name="solicitante" class="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
                                 <option value="">Todos</option>
                                 @foreach ($solicitantes as $u)
                                     <option value="{{ $u->id }}" @selected(($solicitante ?? '') == $u->id)>{{ $u->name }}</option>
@@ -89,17 +85,15 @@
                         @role('administrador|compras')
                         <div class="col-span-2 md:col-span-1">
                             <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Método pago</label>
-                            <select name="metodo_pago"
-                                    class="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                            <select name="metodo_pago" class="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
                                 <option value="">Todos</option>
-                                <option value="tarjeta"       @selected(($metodo_pago ?? '') === 'tarjeta')>💳 Tarjeta</option>
+                                <option value="tarjeta" @selected(($metodo_pago ?? '') === 'tarjeta')>💳 Tarjeta</option>
                                 <option value="transferencia" @selected(($metodo_pago ?? '') === 'transferencia')>🏦 Transferencia</option>
                             </select>
                         </div>
                         <div class="col-span-2 md:col-span-1">
                             <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tipo</label>
-                            <select name="pago_factura"
-                                    class="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                            <select name="pago_factura" class="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
                                 <option value="">Todos</option>
                                 <option value="0" @selected(($pago_factura ?? '') === '0')>Requisición</option>
                                 <option value="1" @selected(($pago_factura ?? '') === '1')>Pago de factura</option>
@@ -109,13 +103,9 @@
 
                         <div class="flex items-end col-span-2 gap-2 md:col-span-1">
                             <button class="flex-1 px-3 py-2 text-sm font-semibold text-white transition rounded-lg"
-                                    style="background: linear-gradient(135deg, #4A1660, #7c3aed);">
-                                Aplicar
-                            </button>
+                                    style="background: linear-gradient(135deg, #4A1660, #7c3aed);">Aplicar</button>
                             <a href="{{ route('requisiciones.index') }}"
-                               class="flex-1 px-3 py-2 text-sm font-medium text-center text-gray-600 transition bg-gray-100 rounded-lg hover:bg-gray-200">
-                                Limpiar
-                            </a>
+                               class="flex-1 px-3 py-2 text-sm font-medium text-center text-gray-600 transition bg-gray-100 rounded-lg hover:bg-gray-200">Limpiar</a>
                         </div>
                     </form>
                 </div>
@@ -130,7 +120,7 @@
                                 <th class="px-4 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">Folio</th>
                                 <th class="px-4 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">Fecha</th>
                                 <th class="px-4 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">Solicitante</th>
-                                <th class="px-4 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">Departamento</th>
+                                <th class="px-4 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">Artículos</th>
                                 <th class="px-4 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">Estado</th>
                                 @role('administrador|compras')
                                 <th class="px-4 py-3.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">Pago</th>
@@ -142,9 +132,8 @@
                         <tbody class="divide-y divide-gray-50">
                             @forelse ($requisiciones as $r)
                                 @php
-                                    $color  = $r->estadoColor;
-                                    $canPdf = in_array($r->estado, ['aprobada_final', 'pendiente_cierre', 'recibida'], true);
-                                    // Borde izquierdo según estado
+                                    $color       = $r->estadoColor;
+                                    $canPdf      = in_array($r->estado, ['aprobada_final', 'pendiente_cierre', 'recibida'], true);
                                     $borderColor = match($r->estado) {
                                         'en_revision_compras' => '#7c3aed',
                                         'rechazada_compras'   => '#f97316',
@@ -155,6 +144,11 @@
                                         'rechazada'           => '#ef4444',
                                         default               => 'transparent',
                                     };
+                                    // Artículos para mostrar
+                                    $items        = $r->items;
+                                    $primerItem   = $items->first()?->descripcion ?? '—';
+                                    $restoItems   = $items->skip(1)->pluck('descripcion');
+                                    $totalItems   = $items->count();
                                 @endphp
                                 <tr class="transition-colors hover:bg-purple-50/20 group"
                                     style="border-left: 3px solid {{ $borderColor }};">
@@ -170,7 +164,7 @@
                                                 <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-violet-100 text-violet-700">FAC</span>
                                             @endif
                                             @if($r->urgencia === 'urgente')
-                                                <span class="text-xs" title="Urgente">🔴</span>
+                                                <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-100 text-orange-700" title="Afecta proceso de producción">⚠️ Producción</span>
                                             @endif
                                         </div>
                                     </td>
@@ -179,9 +173,26 @@
                                         {{ \Carbon\Carbon::parse($r->fecha_emision)->format('d/m/Y') }}
                                     </td>
 
-                                    <td class="px-4 py-3.5 text-sm text-gray-700 font-medium">{{ $r->solicitante?->name ?? '—' }}</td>
+                                    <td class="px-4 py-3.5 text-sm font-medium text-gray-700">{{ $r->solicitante?->name ?? '—' }}</td>
 
-                                    <td class="px-4 py-3.5 text-xs text-gray-500">{{ $r->departamentoRef?->nombre ?? '—' }}</td>
+                                    {{-- Artículos con ver más --}}
+                                    <td class="px-4 py-3.5 max-w-[220px]">
+                                        <div x-data="{ open: false }">
+                                            <p class="text-xs text-gray-700 font-medium leading-snug">{{ $primerItem }}</p>
+                                            @if($totalItems > 1)
+                                                <div x-show="open" x-collapse class="mt-1 space-y-0.5">
+                                                    @foreach($restoItems as $desc)
+                                                        <p class="text-xs text-gray-500 leading-snug">{{ $desc }}</p>
+                                                    @endforeach
+                                                </div>
+                                                <button type="button"
+                                                        @click="open = !open"
+                                                        class="mt-1 inline-flex items-center gap-0.5 text-[10px] font-semibold text-indigo-500 hover:text-indigo-700 transition-colors">
+                                                    <span x-text="open ? 'Ver menos ▲' : '+ {{ $totalItems - 1 }} más ▼'"></span>
+                                                </button>
+                                            @endif
+                                        </div>
+                                    </td>
 
                                     {{-- Estado --}}
                                     <td class="px-4 py-3.5">
@@ -191,13 +202,12 @@
                                         </span>
                                     </td>
 
-                                    {{-- Método de pago --}}
                                     @role('administrador|compras')
                                     <td class="px-4 py-3.5">
                                         @if($r->metodo_pago)
                                             <span @class([
                                                 'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold',
-                                                'bg-blue-50 text-blue-700'   => $r->metodo_pago === 'transferencia',
+                                                'bg-blue-50 text-blue-700'     => $r->metodo_pago === 'transferencia',
                                                 'bg-purple-50 text-purple-700' => $r->metodo_pago === 'tarjeta',
                                             ])>
                                                 {{ $r->metodo_pago === 'tarjeta' ? '💳' : '🏦' }}
@@ -216,7 +226,6 @@
                                     {{-- Acciones --}}
                                     <td class="px-4 py-3.5 text-right">
                                         <div class="inline-flex items-center gap-1.5 text-xs">
-
                                             @role('administrador|compras')
                                             @if($r->estado === 'en_revision_compras')
                                                 <a href="{{ route('requisiciones.revisar', $r) }}"
