@@ -215,7 +215,7 @@ class Requisicion extends Model
         }
 
         // Jefe: sus requisiciones + las de sus subordinados + las que tiene pendiente aprobar
-        if ($user->hasRole('jefe')) {
+        if ($user->roles->pluck('name')->map(fn($r) => strtolower($r))->contains('jefe')) {
             return $query->where(function ($q) use ($user) {
                 $q->where('solicitante_id', $user->id)
                 ->orWhereHas('solicitante', fn($u) => $u->where('supervisor_id', $user->id))
