@@ -10,6 +10,7 @@ use App\Http\Controllers\DepartamentoGerenteController;
 use App\Http\Controllers\UnidadMedidaController;
 use App\Http\Controllers\TipoImpuestoController;
 use App\Livewire\Requisiciones\CerrarRequisicion;
+use App\Http\Controllers\TipoRetencionController;
 use App\Http\Controllers\RequisicionExportController;
 
 use App\Livewire\Requisiciones\RevisarRequisicion;
@@ -147,6 +148,15 @@ Route::middleware(['auth', 'role:administrador|compras'])->prefix('catalogos')->
     Route::get('/impuestos/{impuesto}/edit',     [TipoImpuestoController::class, 'edit'])   ->name('impuestos.edit');
     Route::put('/impuestos/{impuesto}',          [TipoImpuestoController::class, 'update']) ->name('impuestos.update');
     Route::patch('/impuestos/{impuesto}/toggle', [TipoImpuestoController::class, 'toggle']) ->name('impuestos.toggle');
+
+    // Tipos de Retención
+    Route::get('/retenciones',                       [TipoRetencionController::class, 'index'])   ->name('retenciones.index');
+    Route::get('/retenciones/create',                [TipoRetencionController::class, 'create'])  ->name('retenciones.create');
+    Route::post('/retenciones',                      [TipoRetencionController::class, 'store'])   ->name('retenciones.store');
+    Route::get('/retenciones/{retencion}/edit',      [TipoRetencionController::class, 'edit'])    ->name('retenciones.edit');
+    Route::put('/retenciones/{retencion}',           [TipoRetencionController::class, 'update'])  ->name('retenciones.update');
+    Route::patch('/retenciones/{retencion}/toggle',  [TipoRetencionController::class, 'toggle'])  ->name('retenciones.toggle');
+
  
 });
 

@@ -79,6 +79,7 @@ class RequisicionController extends Controller
             'items.unidadMedida',
             'items.tipoImpuesto',
             'items.archivos',
+            'items.retenciones.tipoRetencion', 
             'aprobaciones.nivel',
             'aprobaciones.aprobador',
         ]);
@@ -95,7 +96,7 @@ class RequisicionController extends Controller
         $this->authorize('receive', $requisicion);
 
         // para tu vista recibir (resumen + tabla)
-        $requisicion->load(['solicitante','departamentoRef','centroCostoRef','items']);
+        $requisicion->load(['solicitante','departamentoRef','centroCostoRef','items','items.retenciones.tipoRetencion']);
 
         return view('requisiciones.recibir', compact('requisicion'));
     }
@@ -160,6 +161,7 @@ class RequisicionController extends Controller
             'centroCostoRef:id,nombre',
             'items'               => fn($q) => $q->orderBy('id'),
             'items.unidadMedida',          // ← nuevo: unidad del catálogo
+            'items.retenciones.tipoRetencion',
             'items.tipoImpuesto',          // ← impuesto 1
             'items.tipoImpuesto2',         // ← impuesto 2
             'aprobaciones.nivel',

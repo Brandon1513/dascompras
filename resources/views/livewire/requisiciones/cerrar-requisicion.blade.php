@@ -20,6 +20,12 @@
     </div>
 
     {{-- ══ RESUMEN ══════════════════════════════════════════════════════ --}}
+    @php
+        $hayRetenciones = $requisicion->es_pago_factura &&
+            $requisicion->items->sum(fn($it) => (float)($it->monto_retenciones ?? 0)) > 0;
+        $totalRet  = $hayRetenciones ? $requisicion->items->sum(fn($it) => (float)($it->monto_retenciones ?? 0)) : 0;
+        $totalNeto = $hayRetenciones ? $requisicion->items->sum(fn($it) => (float)($it->total_neto ?? $it->total_item ?? 0)) : (float)$requisicion->total;
+    @endphp
     <div class="p-5 bg-white border border-gray-200 shadow-sm rounded-xl">
         <div class="flex items-start justify-between mb-4">
             <div>
@@ -36,7 +42,7 @@
                     </span>
                 @endif
                 @if($requisicion->urgencia === 'urgente')
-                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-700 border border-red-200">🔴 Urgente</span>
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-700 border border-red-200">⚠️ Afecta producción</span>
                 @endif
             </div>
         </div>
@@ -60,6 +66,20 @@
             </div>
         </dl>
 
+        {{-- Retenciones y total neto (solo si aplica) --}}
+        @if($hayRetenciones)
+        <div class="grid grid-cols-2 gap-4 text-sm md:grid-cols-4 mt-3 pt-3 border-t border-rose-100">
+            <div class="md:col-start-3">
+                <dt class="text-xs text-rose-500 mb-0.5">Retenciones</dt>
+                <dd class="font-semibold text-rose-600">- ${{ number_format($totalRet, 2) }}</dd>
+            </div>
+            <div>
+                <dt class="text-xs text-gray-500 mb-0.5">Total neto a pagar</dt>
+                <dd class="text-base font-bold" style="color: #4A1660">${{ number_format($totalNeto, 2) }}</dd>
+            </div>
+        </div>
+        @endif
+
         @if($requisicion->metodo_pago)
         <div class="flex items-center gap-2 pt-3 mt-3 border-t border-gray-100">
             <dt class="text-xs text-gray-500">Método de pago:</dt>
@@ -68,7 +88,11 @@
                     'inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border',
                     'bg-blue-50 text-blue-700 border-blue-200'       => $requisicion->metodo_pago === 'transferencia',
                     'bg-purple-50 text-purple-700 border-purple-200' => $requisicion->metodo_pago === 'tarjeta',
-                ])>{{ ucfirst($requisicion->metodo_pago) }}</span>
+                    'bg-green-50 text-green-700 border-green-200'    => $requisicion->metodo_pago === 'efectivo',
+                ])>
+                    {{ match($requisicion->metodo_pago) { 'tarjeta' => '💳', 'transferencia' => '🏦', 'efectivo' => '💵', default => '' } }}
+                    {{ ucfirst($requisicion->metodo_pago) }}
+                </span>
             </dd>
         </div>
         @endif
@@ -77,13 +101,11 @@
     {{-- ══ PANEL PRINCIPAL ══════════════════════════════════════════════ --}}
     <div class="p-5 space-y-5 bg-white border border-gray-200 shadow-sm rounded-xl">
 
-        {{-- Si es pago de factura, la factura ya existe — no preguntamos --}}
         @if($requisicion->es_pago_factura)
 
             {{-- Factura del solicitante --}}
             <div>
                 <h3 class="mb-3 text-sm font-semibold text-gray-700">Factura adjunta por el solicitante</h3>
-
                 <div class="flex items-center justify-between p-4 border border-indigo-200 bg-indigo-50 rounded-xl">
                     <div class="flex items-center min-w-0 gap-3">
                         <span class="text-2xl">📄</span>
@@ -131,14 +153,12 @@
                 @endif
 
                 <input type="text"
-                       wire:model.lazy="uuid_factura"
+                       wire:model="uuid_factura"
                        placeholder="XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
                        maxlength="36"
                        class="w-full rounded-lg border-gray-300 text-sm font-mono shadow-sm focus:ring-emerald-500 focus:border-emerald-500
                               @error('uuid_factura') border-red-400 @enderror">
-                <p class="mt-1 text-xs text-gray-400">
-                    Puedes copiarlo del correo del SAT o del PDF de la factura.
-                </p>
+                <p class="mt-1 text-xs text-gray-400">Puedes copiarlo del correo del SAT o del PDF de la factura.</p>
                 @error('uuid_factura')
                     <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                 @enderror
@@ -154,7 +174,6 @@
                           class="w-full text-sm border-gray-300 rounded-lg shadow-sm focus:ring-emerald-500 focus:border-emerald-500"></textarea>
             </div>
 
-            {{-- Botón cerrar --}}
             <div class="pt-2">
                 <button type="button" wire:click="cerrarConFactura"
                         wire:loading.attr="disabled" wire:target="cerrarConFactura"
@@ -174,13 +193,11 @@
                 </button>
             </div>
 
-        {{-- Si NO es pago de factura, mostrar el flujo normal de selección --}}
         @else
 
             <h3 class="text-sm font-semibold text-gray-700">¿Se tiene factura del proveedor?</h3>
 
             <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-                {{-- Opción SÍ --}}
                 <button type="button"
                         wire:click="$set('tiene_factura', true)"
                         @class([
@@ -198,16 +215,11 @@
                         </svg>
                     </div>
                     <div>
-                        <p @class([
-                            'text-sm font-semibold',
-                            'text-emerald-800' => $tiene_factura === true,
-                            'text-gray-700'    => $tiene_factura !== true,
-                        ])>Sí, tengo la factura</p>
+                        <p @class(['text-sm font-semibold', 'text-emerald-800' => $tiene_factura === true, 'text-gray-700' => $tiene_factura !== true])>Sí, tengo la factura</p>
                         <p class="text-xs text-gray-400 mt-0.5">Adjuntar PDF o imagen de la factura</p>
                     </div>
                 </button>
 
-                {{-- Opción NO --}}
                 <button type="button"
                         wire:click="$set('tiene_factura', false)"
                         @class([
@@ -225,21 +237,14 @@
                         </svg>
                     </div>
                     <div>
-                        <p @class([
-                            'text-sm font-semibold',
-                            'text-orange-800' => $tiene_factura === false,
-                            'text-gray-700'   => $tiene_factura !== false,
-                        ])>No, sin factura por ahora</p>
+                        <p @class(['text-sm font-semibold', 'text-orange-800' => $tiene_factura === false, 'text-gray-700' => $tiene_factura !== false])>No, sin factura por ahora</p>
                         <p class="text-xs text-gray-400 mt-0.5">Se registrará para el reporte</p>
                     </div>
                 </button>
             </div>
 
-            {{-- ══ CON FACTURA ══ --}}
             @if($tiene_factura === true)
             <div class="pt-2 space-y-4 border-t border-gray-100">
-
-                {{-- Subir / mostrar factura --}}
                 <div>
                     <label class="block mb-2 text-sm font-medium text-gray-700">
                         Factura del proveedor <span class="text-red-500">*</span>
@@ -300,7 +305,6 @@
                     @enderror
                 </div>
 
-                {{-- Mensaje extracción UUID --}}
                 @if($mensajeExtraccion)
                 <div @class([
                     'flex items-center gap-2 p-3 rounded-lg text-xs font-medium',
@@ -309,7 +313,6 @@
                 ])>{{ $mensajeExtraccion }}</div>
                 @endif
 
-                {{-- UUID --}}
                 <div>
                     <label class="block mb-1 text-sm font-medium text-gray-700">
                         UUID / Folio Fiscal
@@ -320,7 +323,7 @@
                         @endif
                     </label>
                     <input type="text"
-                           wire:model.lazy="uuid_factura"
+                           wire:model="uuid_factura"
                            placeholder="XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
                            maxlength="36"
                            class="w-full rounded-lg border-gray-300 text-sm font-mono shadow-sm focus:ring-emerald-500 focus:border-emerald-500
@@ -330,7 +333,6 @@
                     @enderror
                 </div>
 
-                {{-- Notas --}}
                 <div>
                     <label class="block mb-1 text-sm font-medium text-gray-700">
                         Notas de cierre <span class="font-normal text-gray-400">(opcional)</span>
@@ -359,7 +361,6 @@
             </div>
             @endif
 
-            {{-- ══ SIN FACTURA ══ --}}
             @if($tiene_factura === false)
             <div class="pt-2 space-y-4 border-t border-gray-100">
                 <div class="p-4 text-sm text-orange-800 border border-orange-200 rounded-lg bg-orange-50">
@@ -388,7 +389,7 @@
             </div>
             @endif
 
-        @endif {{-- fin @if($requisicion->es_pago_factura) --}}
+        @endif
 
     </div>
 

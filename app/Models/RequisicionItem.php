@@ -28,6 +28,10 @@ class RequisicionItem extends Model
         // Segundo impuesto
         'tipo_impuesto_id_2',
         'monto_impuesto_2',
+        'metodo_pago',
+        'monto_retenciones',
+        'total_neto',
+
     ];
 
     protected $casts = [
@@ -37,6 +41,8 @@ class RequisicionItem extends Model
         'monto_impuesto'   => 'decimal:2',
         'monto_impuesto_2' => 'decimal:2',
         'total_item'       => 'decimal:2',
+        'monto_retenciones' => 'decimal:2',
+        'total_neto'        => 'decimal:2',
     ];
 
     // ─── Relaciones ───────────────────────────────────────────────────────────
@@ -60,6 +66,22 @@ class RequisicionItem extends Model
     {
         return $this->belongsTo(TipoImpuesto::class, 'tipo_impuesto_id_2');
     }
+        public function retenciones(): HasMany
+    {
+        return $this->hasMany(RequisicionItemRetencion::class);
+    }
+ 
+    // Tipos de retención con monto calculado
+    public function tiposRetencion()
+    {
+        return $this->belongsToMany(
+            TipoRetencion::class,
+            'requisicion_item_retenciones',
+            'requisicion_item_id',
+            'tipo_retencion_id'
+        )->withPivot('monto')->withTimestamps();
+    }
+
 
     public function archivos(): HasMany
     {
@@ -97,18 +119,32 @@ class RequisicionItem extends Model
     public function calcularTotales(): void
     {
         $this->subtotal = round((float) $this->cantidad * (float) $this->precio_unitario, 2);
-
+ 
         // Impuesto 1
         $pct1 = (float) ($this->tipoImpuesto?->porcentaje ?? 0);
         $this->monto_impuesto = round($this->subtotal * ($pct1 / 100), 2);
-
+ 
         // Impuesto 2
         $pct2 = (float) ($this->tipoImpuesto2?->porcentaje ?? 0);
         $this->monto_impuesto_2 = round($this->subtotal * ($pct2 / 100), 2);
-
+ 
         $this->total_item = round(
             $this->subtotal + $this->monto_impuesto + $this->monto_impuesto_2,
             2
         );
+ 
+        // Retenciones (solo si ya están cargadas)
+        $montoRet = 0;
+        if ($this->relationLoaded('retenciones')) {
+            foreach ($this->retenciones as $ret) {
+                $pctRet    = (float) ($ret->tipoRetencion?->porcentaje ?? 0);
+                $montoRet += round($this->subtotal * ($pctRet / 100), 2);
+            }
+        }
+ 
+        $this->monto_retenciones = round($montoRet, 2);
+        $this->total_neto        = round($this->total_item - $this->monto_retenciones, 2);
     }
+ 
+
 }

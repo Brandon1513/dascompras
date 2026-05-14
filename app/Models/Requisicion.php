@@ -268,6 +268,42 @@ class Requisicion extends Model
         return self::METODOS_PAGO_LABEL[$this->metodo_pago] ?? '—';
     }
 
+        /**
+     * Total neto a pagar (total - retenciones).
+     * Si la requisición no es pago de factura, es igual al total.
+     * Requiere que los items estén cargados con eager loading.
+     */
+    public function getTotalNetoAttribute(): float
+    {
+        if (!$this->es_pago_factura) {
+            return (float) $this->total;
+        }
+ 
+        // Si los items están cargados y tienen total_neto, usarlos
+        if ($this->relationLoaded('items')) {
+            $suma = $this->items->sum(fn($it) => (float) ($it->total_neto ?? $it->total_item ?? 0));
+            if ($suma > 0) return round($suma, 2);
+        }
+ 
+        return (float) $this->total;
+    }
+ 
+    /**
+     * Total de retenciones de toda la requisición.
+     */
+    public function getTotalRetencionesAttribute(): float
+    {
+        if (!$this->es_pago_factura) return 0;
+ 
+        if ($this->relationLoaded('items')) {
+            return round($this->items->sum(fn($it) => (float) ($it->monto_retenciones ?? 0)), 2);
+        }
+ 
+        return 0;
+    }
+ 
+
+
     // ─── Helpers de estado ────────────────────────────────────────────────
 
     public function esBorrador(): bool              { return $this->estado === 'borrador'; }

@@ -14,6 +14,7 @@
   .partidas th,.partidas td{font-size:11px; padding:5px 6px;}
 
   .thead{background:#f1e6ff; font-weight:700}
+  .thead-ret{background:#fce7f3; font-weight:700; color:#9d174d;}
   .t-center{text-align:center}.t-right{text-align:right}.t-muted{color:#555}
   .badge{display:inline-block;padding:2px 6px;border:1px solid #c9a3ff;border-radius:6px}
   .header{border:1px solid #d1c4e9; padding:8px; border-radius:8px}
@@ -23,6 +24,8 @@
   .totals td { border:none; padding:4px 0 }
   .totals .label { text-align:right; padding-right:10px; }
   .purple { background:#f3e8ff }
+  .ret-cell { background:#fdf2f8; color:#9d174d; font-size:10px; }
+  .ret-total { color:#be123c; font-weight:700; }
 
   .firma-img{
     max-height:60px;
@@ -75,6 +78,16 @@
   $nombreAreaRec     = trim(($requisicion->recibe_nombre ?? '')
       . (($requisicion->area_recibe ?? '') ? ' — '.$requisicion->area_recibe : ''));
   $nombreRecibeFirma = $requisicion->recibe_nombre ?? '';
+
+  // Retenciones
+  $hayRetenciones = $requisicion->es_pago_factura &&
+      $requisicion->items->sum(fn($it) => (float)($it->monto_retenciones ?? 0)) > 0;
+  $totalRetenciones = $hayRetenciones
+      ? $requisicion->items->sum(fn($it) => (float)($it->monto_retenciones ?? 0))
+      : 0;
+  $totalNeto = $hayRetenciones
+      ? $requisicion->items->sum(fn($it) => (float)($it->total_neto ?? $it->total_item ?? 0))
+      : (float)$total;
 @endphp
 
   <!-- Encabezado -->
@@ -129,13 +142,16 @@
     <tr class="thead">
       <th style="width:6%"  class="t-center">Cant.</th>
       <th style="width:6%"  class="t-center">Unidad</th>
-      <th style="width:22%">Artículo / Descripción</th>
-      <th style="width:22%">Link de referencia</th>
-      <th style="width:14%">Proveedor sugerido</th>
-      <th style="width:10%" class="t-right">P. Unitario</th>
-      <th style="width:10%" class="t-right">Subtotal</th>
-      <th style="width:10%" class="t-right">Impuesto(s)</th>
-      <th style="width:10%" class="t-right">Total</th>
+      <th style="width:{{ $hayRetenciones ? '18%' : '22%' }}">Artículo / Descripción</th>
+      <th style="width:{{ $hayRetenciones ? '16%' : '22%' }}">Link de referencia</th>
+      <th style="width:12%">Proveedor sugerido</th>
+      <th style="width:9%" class="t-right">P. Unitario</th>
+      <th style="width:9%" class="t-right">Subtotal</th>
+      <th style="width:9%" class="t-right">Impuesto(s)</th>
+      @if($hayRetenciones)
+      <th style="width:9%" class="t-right thead-ret">Retenciones</th>
+      @endif
+      <th style="width:9%" class="t-right">Total</th>
     </tr>
 
     @forelse($requisicion->items as $it)
@@ -147,19 +163,35 @@
         $imp2      = (float) ($it->monto_impuesto_2 ?? 0);
         $impTotal  = $imp1 + $imp2;
         $totalItem = !is_null($it->total_item) ? (float) $it->total_item : ($sub + $impTotal);
+        $montoRet  = (float) ($it->monto_retenciones ?? 0);
+        $totalNet  = (float) ($it->total_neto ?? $totalItem);
 
-        // Etiqueta de unidad: catálogo primero, luego campo texto heredado
         $unidadLabel = $it->unidadMedida?->abreviatura ?? $it->unidad ?? '—';
+        $imp1Label   = $it->tipoImpuesto?->nombre ?? null;
+        $imp2Label   = $it->tipoImpuesto2?->nombre ?? null;
 
-        // Etiquetas de impuestos
-        $imp1Label = $it->tipoImpuesto?->nombre ?? null;
-        $imp2Label = $it->tipoImpuesto2?->nombre ?? null;
+        // Nombres de retenciones de esta partida
+        $retencionesNombres = $it->retenciones
+            ->map(fn($r) => $r->tipoRetencion?->nombre ?? '')
+            ->filter()
+            ->implode(', ');
+
+        // Método de pago por partida
+        $metodoPago = $it->metodo_pago ?? null;
       @endphp
 
       <tr>
         <td class="t-center">{{ $cant }}</td>
         <td class="t-center">{{ $unidadLabel }}</td>
-        <td>{!! nl2br(e($it->descripcion ?? '')) !!}</td>
+        <td>
+          {!! nl2br(e($it->descripcion ?? '')) !!}
+          @if($metodoPago)
+            <div style="margin-top:3px; font-size:9px; color:#5b21b6;">
+              {{ match($metodoPago) { 'tarjeta' => '💳', 'transferencia' => '🏦', 'efectivo' => '💵', default => '' } }}
+              {{ ucfirst($metodoPago) }}
+            </div>
+          @endif
+        </td>
         <td>
           @if(!empty($it->link_compra))
             <a href="{{ $it->link_compra }}" style="font-size:9px; word-break:break-all;">
@@ -186,10 +218,29 @@
             <span class="t-muted">—</span>
           @endif
         </td>
-        <td class="t-right"><b>${{ number_format($totalItem, 2) }}</b></td>
+        @if($hayRetenciones)
+        <td class="t-right ret-cell">
+          @if($montoRet > 0)
+            <span class="ret-total">- ${{ number_format($montoRet, 2) }}</span>
+            @if($retencionesNombres)
+              <div style="font-size:9px; color:#be123c; margin-top:2px;">{{ $retencionesNombres }}</div>
+            @endif
+          @else
+            <span class="t-muted">—</span>
+          @endif
+        </td>
+        @endif
+        <td class="t-right">
+          @if($hayRetenciones && $montoRet > 0)
+            <b>${{ number_format($totalNet, 2) }}</b>
+            <div style="font-size:9px; color:#777; margin-top:2px;">neto</div>
+          @else
+            <b>${{ number_format($totalItem, 2) }}</b>
+          @endif
+        </td>
       </tr>
     @empty
-      <tr><td colspan="9" class="t-center t-muted">Sin partidas</td></tr>
+      <tr><td colspan="{{ $hayRetenciones ? 10 : 9 }}" class="t-center t-muted">Sin partidas</td></tr>
     @endforelse
   </table>
 
@@ -198,7 +249,7 @@
     <tr>
       <td class="w-50">
         @if($requisicion->metodo_pago)
-          <div class="t-muted">Método de pago:
+          <div class="t-muted">Método de pago general:
             <b>{{ ucfirst($requisicion->metodo_pago) }}</b>
           </div>
         @endif
@@ -222,6 +273,16 @@
             <td class="label"><b>Total:</b></td>
             <td class="t-right"><b>${{ number_format($total, 2) }}</b></td>
           </tr>
+          @if($hayRetenciones)
+          <tr>
+            <td class="label" style="color:#be123c;">Retenciones:</td>
+            <td class="t-right" style="color:#be123c; font-weight:700;">- ${{ number_format($totalRetenciones, 2) }}</td>
+          </tr>
+          <tr>
+            <td class="label"><b>Total neto a pagar:</b></td>
+            <td class="t-right"><b style="color:#4A1660; font-size:13px;">${{ number_format($totalNeto, 2) }}</b></td>
+          </tr>
+          @endif
         </table>
       </td>
     </tr>

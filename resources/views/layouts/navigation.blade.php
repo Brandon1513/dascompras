@@ -134,7 +134,7 @@
                              x-transition:leave="transition ease-in duration-100"
                              x-transition:leave-start="opacity-100 translate-y-0"
                              x-transition:leave-end="opacity-0 -translate-y-1"
-                             class="absolute top-full left-0 mt-1.5 w-60 bg-white rounded-xl shadow-xl border border-gray-100 py-1.5 z-50">
+                             class="absolute top-full left-0 mt-1.5 w-64 bg-white rounded-xl shadow-xl border border-gray-100 py-1.5 z-50">
                             <a href="{{ route('requisiciones.index') }}"
                                class="flex items-center gap-2.5 px-3 py-2 mx-1.5 rounded-lg text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors duration-100
                                       {{ request()->routeIs('requisiciones.index') ? 'bg-purple-50 text-purple-700 font-medium' : '' }}">
@@ -172,6 +172,14 @@
                                 </span>
                                 Tipos de Impuesto
                             </a>
+                            <a href="{{ route('catalogos.retenciones.index') }}"
+                               class="flex items-center gap-2.5 px-3 py-2 mx-1.5 rounded-lg text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors duration-100
+                                      {{ request()->routeIs('catalogos.retenciones.*') ? 'bg-purple-50 text-purple-700 font-medium' : '' }}">
+                                <span class="flex items-center justify-center rounded-lg w-7 h-7 bg-rose-100 text-rose-600 shrink-0">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2zM10 8.5a.5.5 0 11-1 0 .5.5 0 011 0zm5 5a.5.5 0 11-1 0 .5.5 0 011 0z"/></svg>
+                                </span>
+                                Tipos de Retención
+                            </a>
                             @endif
                         </div>
                     </div>
@@ -183,17 +191,14 @@
             {{-- ── Derecha: usuario ─────────────────────────────────────────── --}}
             <div class="flex items-center gap-3">
                 @auth
-                {{-- Badge rol (solo desktop grande) --}}
                 <span class="hidden lg:inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-widest border"
                       style="background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.6); border-color: rgba(255,255,255,0.12);">
                     {{ Auth::user()->getRoleNames()->first() ?? 'usuario' }}
                 </span>
 
-                {{-- Menú usuario --}}
                 <div class="relative" x-data="{ open: false }" @mouseenter="open = true" @mouseleave="open = false">
                     <button class="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-xl border transition-all duration-150 hover:bg-white/10"
                             style="background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.12);">
-                        {{-- Avatar inicial --}}
                         <span class="flex items-center justify-center text-xs font-bold text-white rounded-lg w-7 h-7 shrink-0"
                               style="background: rgba(232,121,249,0.35);">
                             {{ strtoupper(substr(Auth::user()->name, 0, 1)) }}
@@ -213,7 +218,6 @@
                          x-transition:leave-start="opacity-100 translate-y-0"
                          x-transition:leave-end="opacity-0 -translate-y-1"
                          class="absolute top-full right-0 mt-1.5 w-52 bg-white rounded-xl shadow-xl border border-gray-100 py-1.5 z-50">
-                        {{-- Info --}}
                         <div class="px-4 py-2 mb-1">
                             <p class="text-xs font-semibold text-gray-800 truncate">{{ Auth::user()->name }}</p>
                             <p class="text-[11px] text-gray-400 truncate">{{ Auth::user()->email }}</p>
@@ -241,7 +245,6 @@
                     </div>
                 </div>
 
-                {{-- Botón hamburguesa (móvil) --}}
                 <button @click="open = !open"
                         class="flex items-center justify-center transition-all duration-150 rounded-lg md:hidden w-9 h-9 text-white/70 hover:text-white hover:bg-white/10">
                     <svg class="w-5 h-5" :class="open ? 'hidden' : 'block'" stroke="currentColor" fill="none" viewBox="0 0 24 24">
@@ -340,9 +343,13 @@
                       {{ request()->routeIs('catalogos.impuestos.*') ? 'bg-white/15 text-white font-semibold' : 'text-white/70 hover:text-white hover:bg-white/10' }}">
                 Tipos de Impuesto
             </a>
+            <a href="{{ route('catalogos.retenciones.index') }}"
+               class="flex items-center w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-100
+                      {{ request()->routeIs('catalogos.retenciones.*') ? 'bg-white/15 text-white font-semibold' : 'text-white/70 hover:text-white hover:bg-white/10' }}">
+                Tipos de Retención
+            </a>
             @endif
 
-            {{-- Perfil / Salir --}}
             <div class="pt-3 mt-1" style="border-top: 1px solid rgba(255,255,255,0.1);">
                 <div class="px-3 py-2 mb-1">
                     <p class="text-sm font-semibold text-white">{{ Auth::user()->name }}</p>

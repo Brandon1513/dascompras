@@ -46,6 +46,7 @@ class CerrarRequisicion extends Component
             'items.tipoImpuesto',
             'aprobaciones.nivel',
             'aprobaciones.aprobador',
+            'items.retenciones.tipoRetencion',
         ]);
 
         $this->requisicion  = $requisicion;

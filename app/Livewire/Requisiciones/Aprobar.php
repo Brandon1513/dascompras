@@ -176,29 +176,36 @@ class Aprobar extends Component
         $this->js("window.location.href = '" . route('requisiciones.index') . "'");
     }
 
-    public function reject()
-    {
-        DB::transaction(function () {
-            $ap = $this->miAprobacionPendiente();
-            abort_unless($ap, 403);
+   public function reject()
+{
+    $this->validate([
+        'comentarios' => ['required', 'string', 'min:10', 'max:1000'],
+    ], [
+        'comentarios.required' => 'El motivo del rechazo es obligatorio.',
+        'comentarios.min'      => 'El motivo debe tener al menos 10 caracteres.',
+    ]);
 
-            $ap->update([
-                'estado'       => 'rechazada',
-                'comentarios'  => $this->comentarios,
-                'firmado_en'   => now(),
-                'ip'           => request()->ip(),
-                'aprobador_id' => $ap->aprobador_id ?: Auth::id(),
-            ]);
+    DB::transaction(function () {
+        $ap = $this->miAprobacionPendiente();
+        abort_unless($ap, 403);
 
-            $this->requisicion->update(['estado' => 'rechazada']);
-        });
+        $ap->update([
+            'estado'       => 'rechazada',
+            'comentarios'  => $this->comentarios,
+            'firmado_en'   => now(),
+            'ip'           => request()->ip(),
+            'aprobador_id' => $ap->aprobador_id ?: Auth::id(),
+        ]);
 
-        optional($this->requisicion->solicitante)
-            ->notify(new RequisicionRechazada($this->requisicion, $this->comentarios));
+        $this->requisicion->update(['estado' => 'rechazada']);
+    });
 
-        session()->flash('status', '⛔ Rechazada. Se notificó al solicitante.');
-        $this->js("window.location.href = '" . route('requisiciones.index') . "'");
-    }
+    optional($this->requisicion->solicitante)
+        ->notify(new RequisicionRechazada($this->requisicion, $this->comentarios));
+
+    session()->flash('status', '⛔ Rechazada. Se notificó al solicitante con el motivo.');
+    $this->js("window.location.href = '" . route('requisiciones.index') . "'");
+}
 
     public function render()
     {

@@ -4,6 +4,7 @@ namespace App\Livewire\Requisiciones;
 
 use App\Models\User;
 use App\Models\TipoImpuesto;
+use App\Models\TipoRetencion;
 use App\Models\UnidadMedida;
 use App\Models\RequisicionItemArchivo;
 use App\Notifications\RequisicionEnRevisionCompras;
@@ -21,33 +22,36 @@ class RequisicionForm extends Component
 {
     use WithFileUploads;
 
-    public ?int   $requisicionId     = null;
-    public bool   $isEditing         = false;
+    public ?int   $requisicionId      = null;
+    public bool   $isEditing          = false;
     public string $fecha_emision;
-    public ?int   $departamento_id   = null;
-    public ?int   $centro_costo_id   = null;
-    public string $justificacion     = '';
+    public ?int   $departamento_id    = null;
+    public ?int   $centro_costo_id    = null;
+    public string $justificacion      = '';
     public string $solicitante_nombre = '';
-    public bool   $es_pago_factura   = false;
-    public bool   $afecta_produccion = false;  // reemplaza el select de urgencia
-    public string $estado_actual     = 'borrador';
+    public bool   $es_pago_factura    = false;
+    public bool   $afecta_produccion  = false;
+    public string $estado_actual      = 'borrador';
 
-    public mixed   $factura_nueva   = null;
-    public ?string $factura_path    = null;
-    public ?string $factura_nombre  = null;
+    public mixed   $factura_nueva  = null;
+    public ?string $factura_path   = null;
+    public ?string $factura_nombre = null;
 
     public array $items           = [];
     public array $archivos_nuevos = [];
     public mixed $archivo_temp        = null;
     public ?int  $archivo_temp_index  = null;
 
-    public float $subtotal        = 0;
-    public float $total_impuestos = 0;
-    public float $total           = 0;
+    public float $subtotal          = 0;
+    public float $total_impuestos   = 0;
+    public float $total_retenciones = 0;
+    public float $total             = 0;
+    public float $total_neto        = 0;
 
     public array $departamentos   = [];
     public array $unidades_medida = [];
     public array $tipos_impuesto  = [];
+    public array $tipos_retencion = [];
 
     public function mount(?int $requisicionId = null): void
     {
@@ -73,6 +77,15 @@ class RequisicionForm extends Component
                 'porcentaje' => (float) $t->porcentaje,
             ])->toArray();
 
+        $this->tipos_retencion = TipoRetencion::activos()
+            ->get(['id', 'nombre', 'clave', 'porcentaje'])
+            ->map(fn($r) => [
+                'id'         => $r->id,
+                'nombre'     => $r->nombre,
+                'clave'      => $r->clave,
+                'porcentaje' => (float) $r->porcentaje,
+            ])->toArray();
+
         if ($requisicionId) {
             $this->isEditing     = true;
             $this->requisicionId = $requisicionId;
@@ -82,6 +95,7 @@ class RequisicionForm extends Component
                 'items.unidadMedida',
                 'items.tipoImpuesto',
                 'items.tipoImpuesto2',
+                'items.retenciones',
             ])->findOrFail($requisicionId);
 
             $esCompras     = Auth::user()->hasAnyRole(['compras', 'administrador']);
@@ -99,11 +113,10 @@ class RequisicionForm extends Component
             $this->centro_costo_id   = $req->centro_costo_id;
             $this->justificacion     = $req->justificacion;
             $this->es_pago_factura   = (bool) $req->es_pago_factura;
-            $this->afecta_produccion = $req->urgencia === 'urgente'; // cargar del campo urgencia
+            $this->afecta_produccion = $req->urgencia === 'urgente';
             $this->factura_path      = $req->factura_path;
             $this->factura_nombre    = $req->factura_nombre;
             $this->subtotal          = (float) $req->subtotal;
-            $this->total_impuestos   = 0;
             $this->total             = (float) $req->total;
 
             $this->items = $req->items->map(function ($it) {
@@ -120,6 +133,10 @@ class RequisicionForm extends Component
                     'tipo_impuesto_id_2'   => $it->tipo_impuesto_id_2,
                     'monto_impuesto_2'     => (float) ($it->monto_impuesto_2 ?? 0),
                     'total_item'           => (float) $it->total_item,
+                    // Retenciones
+                    'retenciones_ids'      => $it->retenciones->pluck('tipo_retencion_id')->toArray(),
+                    'monto_retenciones'    => (float) ($it->monto_retenciones ?? 0),
+                    'total_neto'           => (float) ($it->total_neto ?? 0),
                     'link_compra'          => $it->link_compra,
                     'proveedor_sugerido'   => $it->proveedor_sugerido,
                     'archivos_existentes'  => $it->archivos->map(fn($a) => [
@@ -159,6 +176,9 @@ class RequisicionForm extends Component
             'tipo_impuesto_id_2'   => null,
             'monto_impuesto_2'     => 0,
             'total_item'           => 0,
+            'retenciones_ids'      => [],
+            'monto_retenciones'    => 0,
+            'total_neto'           => 0,
             'link_compra'          => '',
             'proveedor_sugerido'   => '',
             'archivos_existentes'  => [],
@@ -179,20 +199,6 @@ class RequisicionForm extends Component
         $this->items[]           = $this->itemVacio();
         $this->archivos_nuevos[] = [];
     }
-    public function updatedArchivoTemp(): void
-    {
-        if (!$this->archivo_temp || $this->archivo_temp_index === null) return;
-        $i          = $this->archivo_temp_index;
-        $existentes = count($this->items[$i]['archivos_existentes'] ?? []);
-        $nuevos     = count($this->archivos_nuevos[$i] ?? []);
-        if (($existentes + $nuevos) >= 5) {
-            $this->addError("archivos_nuevos.$i", 'Límite de 5 archivos alcanzado.');
-            $this->archivo_temp = null; $this->archivo_temp_index = null;
-            return;
-        }
-        $this->archivos_nuevos[$i][] = $this->archivo_temp;
-        $this->archivo_temp = null; $this->archivo_temp_index = null;
-    }
 
     public function removeItem(int $index): void
     {
@@ -205,6 +211,26 @@ class RequisicionForm extends Component
         $this->archivos_nuevos = array_values($this->archivos_nuevos);
 
         $this->recalcularTotales();
+    }
+
+    public function updatedArchivoTemp(): void
+    {
+        if (!$this->archivo_temp || $this->archivo_temp_index === null) return;
+
+        $i          = $this->archivo_temp_index;
+        $existentes = count($this->items[$i]['archivos_existentes'] ?? []);
+        $nuevos     = count($this->archivos_nuevos[$i] ?? []);
+
+        if (($existentes + $nuevos) >= 5) {
+            $this->addError("archivos_nuevos.$i", 'Límite de 5 archivos alcanzado.');
+            $this->archivo_temp       = null;
+            $this->archivo_temp_index = null;
+            return;
+        }
+
+        $this->archivos_nuevos[$i][] = $this->archivo_temp;
+        $this->archivo_temp          = null;
+        $this->archivo_temp_index    = null;
     }
 
     public function removeArchivoExistente(int $itemIndex, int $archivoId): void
@@ -226,16 +252,11 @@ class RequisicionForm extends Component
         );
     }
 
-    /**
-     * Quitar un archivo nuevo de la cola antes de guardar (feedback visual).
-     */
     public function removeArchivoNuevo(int $itemIndex, int $archivoIndex): void
     {
         if (isset($this->archivos_nuevos[$itemIndex][$archivoIndex])) {
             unset($this->archivos_nuevos[$itemIndex][$archivoIndex]);
-            $this->archivos_nuevos[$itemIndex] = array_values(
-                $this->archivos_nuevos[$itemIndex]
-            );
+            $this->archivos_nuevos[$itemIndex] = array_values($this->archivos_nuevos[$itemIndex]);
         }
     }
 
@@ -265,35 +286,58 @@ class RequisicionForm extends Component
 
     private function recalcularTotales(): void
     {
-        $subtotalGeneral = 0;
-        $impuestoGeneral = 0;
-        $impuestosMap    = collect($this->tipos_impuesto)->keyBy('id');
+        $subtotalGeneral  = 0;
+        $impuestoGeneral  = 0;
+        $retencionGeneral = 0;
+        $impuestosMap     = collect($this->tipos_impuesto)->keyBy('id');
+        $retencionesMap   = collect($this->tipos_retencion)->keyBy('id');
 
         foreach ($this->items as $i => $row) {
             $cant = (float) ($row['cantidad'] ?? 0);
             $pu   = (float) ($row['precio_unitario'] ?? 0);
             $sub  = round($cant * $pu, 2);
 
+            // Impuesto 1
             $tipoId1 = $row['tipo_impuesto_id'] ?? null;
             $pct1    = $tipoId1 ? (float) ($impuestosMap[$tipoId1]['porcentaje'] ?? 0) : 0;
             $imp1    = round($sub * ($pct1 / 100), 2);
 
+            // Impuesto 2
             $tipoId2 = $row['tipo_impuesto_id_2'] ?? null;
             $pct2    = $tipoId2 ? (float) ($impuestosMap[$tipoId2]['porcentaje'] ?? 0) : 0;
             $imp2    = round($sub * ($pct2 / 100), 2);
 
-            $this->items[$i]['subtotal']         = $sub;
-            $this->items[$i]['monto_impuesto']   = $imp1;
-            $this->items[$i]['monto_impuesto_2'] = $imp2;
-            $this->items[$i]['total_item']       = round($sub + $imp1 + $imp2, 2);
+            $totalItem = round($sub + $imp1 + $imp2, 2);
 
-            $subtotalGeneral += $sub;
-            $impuestoGeneral += $imp1 + $imp2;
+            // Retenciones — solo si es pago de factura
+            $montoRet = 0;
+            if ($this->es_pago_factura) {
+                foreach ($row['retenciones_ids'] ?? [] as $retId) {
+                    $pctRet    = $retId ? (float) ($retencionesMap[$retId]['porcentaje'] ?? 0) : 0;
+                    $montoRet += round($sub * ($pctRet / 100), 2);
+                }
+                $montoRet = round($montoRet, 2);
+            }
+
+            $totalNeto = round($totalItem - $montoRet, 2);
+
+            $this->items[$i]['subtotal']          = $sub;
+            $this->items[$i]['monto_impuesto']    = $imp1;
+            $this->items[$i]['monto_impuesto_2']  = $imp2;
+            $this->items[$i]['total_item']        = $totalItem;
+            $this->items[$i]['monto_retenciones'] = $montoRet;
+            $this->items[$i]['total_neto']        = $totalNeto;
+
+            $subtotalGeneral  += $sub;
+            $impuestoGeneral  += $imp1 + $imp2;
+            $retencionGeneral += $montoRet;
         }
 
-        $this->subtotal        = round($subtotalGeneral, 2);
-        $this->total_impuestos = round($impuestoGeneral, 2);
-        $this->total           = round($subtotalGeneral + $impuestoGeneral, 2);
+        $this->subtotal          = round($subtotalGeneral, 2);
+        $this->total_impuestos   = round($impuestoGeneral, 2);
+        $this->total_retenciones = round($retencionGeneral, 2);
+        $this->total             = round($subtotalGeneral + $impuestoGeneral, 2);
+        $this->total_neto        = round($this->total - $retencionGeneral, 2);
     }
 
     // ─── Validación ───────────────────────────────────────────────────────────
@@ -301,35 +345,34 @@ class RequisicionForm extends Component
     private function rules(): array
     {
         $facturaRules = $this->es_pago_factura && !$this->factura_path
-            ? ['required']
-            : ['nullable'];
+            ? ['required'] : ['nullable'];
 
         return [
-            'fecha_emision'              => ['required', 'date'],
-            'departamento_id'            => ['required', 'exists:departamentos,id'],
-            'centro_costo_id'            => ['required', 'exists:departamentos,id'],
-            'justificacion'              => ['required', 'string', 'min:5'],
-            'es_pago_factura'            => ['boolean'],
-            'afecta_produccion'          => ['boolean'],
-            'factura_nueva'              => array_merge(
-                $facturaRules,
-                ['file', 'max:10240', 'mimes:pdf,jpg,jpeg,png']
-            ),
+            'fecha_emision'                 => ['required', 'date'],
+            'departamento_id'               => ['required', 'exists:departamentos,id'],
+            'centro_costo_id'               => ['required', 'exists:departamentos,id'],
+            'justificacion'                 => ['required', 'string', 'min:5'],
+            'es_pago_factura'               => ['boolean'],
+            'afecta_produccion'             => ['boolean'],
+            'factura_nueva'                 => array_merge($facturaRules,
+                ['file', 'max:10240', 'mimes:pdf,jpg,jpeg,png']),
 
-            'items'                      => ['required', 'array', 'min:1'],
-            'items.*.descripcion'        => ['required', 'string', 'min:2', 'max:255'],
-            'items.*.unidad_medida_id'   => ['nullable', 'exists:unidades_medida,id'],
-            'items.*.cantidad'           => ['required', 'integer', 'min:1'],
-            'items.*.precio_unitario'    => ['required', 'numeric', 'gte:0'],
-            'items.*.tipo_impuesto_id'   => ['nullable', 'exists:tipos_impuesto,id'],
-            'items.*.tipo_impuesto_id_2' => ['nullable', 'exists:tipos_impuesto,id'],
-            'items.*.link_compra'        => ['nullable', 'string', 'max:2000'],  // aumentado de 500 a 2000
-            'items.*.proveedor_sugerido' => ['nullable', 'string', 'max:255'],
+            'items'                         => ['required', 'array', 'min:1'],
+            'items.*.descripcion'           => ['required', 'string', 'min:2', 'max:255'],
+            'items.*.unidad_medida_id'      => ['nullable', 'exists:unidades_medida,id'],
+            'items.*.cantidad'              => ['required', 'integer', 'min:1'],
+            'items.*.precio_unitario'       => ['required', 'numeric', 'gte:0'],
+            'items.*.tipo_impuesto_id'      => ['nullable', 'exists:tipos_impuesto,id'],
+            'items.*.tipo_impuesto_id_2'    => ['nullable', 'exists:tipos_impuesto,id'],
+            'items.*.retenciones_ids'       => ['array'],
+            'items.*.retenciones_ids.*'     => ['exists:tipos_retencion,id'],
+            'items.*.link_compra'           => ['nullable', 'string', 'max:2000'],
+            'items.*.proveedor_sugerido'    => ['nullable', 'string', 'max:255'],
 
-            'archivos_nuevos'            => ['array'],
-            'archivos_nuevos.*'          => ['array', 'max:5'],
-            'archivos_nuevos.*.*'        => ['nullable', 'file', 'max:10240',
-                                             'mimes:pdf,jpg,jpeg,png,doc,docx,xls,xlsx'],
+            'archivos_nuevos'               => ['array'],
+            'archivos_nuevos.*'             => ['array', 'max:5'],
+            'archivos_nuevos.*.*'           => ['nullable', 'file', 'max:10240',
+                                               'mimes:pdf,jpg,jpeg,png,doc,docx,xls,xlsx'],
         ];
     }
 
@@ -433,7 +476,6 @@ class RequisicionForm extends Component
                 'departamento_id' => $this->departamento_id,
                 'centro_costo_id' => $this->centro_costo_id,
                 'justificacion'   => $this->justificacion,
-                // urgencia se deriva del checkbox afecta_produccion
                 'urgencia'        => $this->afecta_produccion ? 'urgente' : 'normal',
                 'es_pago_factura' => $this->es_pago_factura,
                 'factura_path'    => $this->es_pago_factura ? $facturaPath : null,
@@ -461,19 +503,11 @@ class RequisicionForm extends Component
 
                 $req->update($camposBase);
 
-                $idsActuales     = collect($this->items)->pluck('id')->filter()->all();
-                $itemsEliminados = $req->items->whereNotIn('id', $idsActuales);
-
-                foreach ($itemsEliminados as $itemElim) {
-                    foreach ($itemElim->archivos as $arch) {
-                        Storage::disk('public')->delete($arch->path);
-                    }
-                }
-
                 $req->items()->delete();
 
                 foreach ($this->items as $i => $row) {
                     $item = $req->items()->create($this->mapItemData($row));
+                    $this->guardarRetenciones($item, $row);
                     $this->guardarArchivosNuevos($item, $i, $row['archivos_existentes'] ?? []);
                 }
 
@@ -493,6 +527,7 @@ class RequisicionForm extends Component
 
                 foreach ($this->items as $i => $row) {
                     $item = $req->items()->create($this->mapItemData($row));
+                    $this->guardarRetenciones($item, $row);
                     $this->guardarArchivosNuevos($item, $i, []);
                 }
 
@@ -516,6 +551,8 @@ class RequisicionForm extends Component
             'tipo_impuesto_id_2'   => $row['tipo_impuesto_id_2'] ?: null,
             'monto_impuesto_2'     => (float) ($row['monto_impuesto_2'] ?? 0),
             'total_item'           => (float) ($row['total_item'] ?? 0),
+            'monto_retenciones'    => (float) ($row['monto_retenciones'] ?? 0),
+            'total_neto'           => (float) ($row['total_neto'] ?? 0),
             'link_compra'          => $row['link_compra'] ?: null,
             'proveedor_sugerido'   => $row['proveedor_sugerido'] ?: null,
             'ficha_tecnica_path'   => $row['ficha_tecnica_path'] ?? null,
@@ -523,9 +560,32 @@ class RequisicionForm extends Component
         ];
     }
 
+    private function guardarRetenciones(\App\Models\RequisicionItem $item, array $row): void
+    {
+        if (!$this->es_pago_factura) return;
+
+        $retencionesIds = $row['retenciones_ids'] ?? [];
+        if (empty($retencionesIds)) return;
+
+        $retencionesMap = collect($this->tipos_retencion)->keyBy('id');
+        $sub            = (float) ($row['subtotal'] ?? 0);
+
+        foreach ($retencionesIds as $retId) {
+            if (!$retId) continue;
+            $pct   = (float) ($retencionesMap[$retId]['porcentaje'] ?? 0);
+            $monto = round($sub * ($pct / 100), 2);
+
+            \App\Models\RequisicionItemRetencion::create([
+                'requisicion_item_id' => $item->id,
+                'tipo_retencion_id'   => $retId,
+                'monto'               => $monto,
+            ]);
+        }
+    }
+
     private function guardarArchivosNuevos(\App\Models\RequisicionItem $item, int $index, array $existentes): void
     {
-        $uploads     = $this->archivos_nuevos[$index] ?? [];
+        $uploads = $this->archivos_nuevos[$index] ?? [];
         if (empty($uploads)) return;
 
         $disponibles = max(0, 5 - count($existentes));

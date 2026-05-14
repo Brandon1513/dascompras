@@ -1,7 +1,6 @@
 <div class="min-h-screen py-6" style="background: linear-gradient(160deg, #f8f5ff 0%, #f1f5f9 50%, #f8f5ff 100%);">
 <div class="max-w-5xl px-4 mx-auto space-y-4 sm:px-6 lg:px-8">
 
-    {{-- ══ ERRORES ══════════════════════════════════════════════════════ --}}
     @error('general')
         <div class="flex items-center gap-2 p-4 text-sm font-medium text-red-800 border border-red-200 rounded-xl bg-red-50">
             ⚠️ {{ $message }}
@@ -30,7 +29,7 @@
         </div>
     </div>
 
-    {{-- ══ RESUMEN DE LA REQUISICIÓN ═══════════════════════════════════ --}}
+    {{-- ══ RESUMEN ══════════════════════════════════════════════════════ --}}
     <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-xl">
         <div class="flex items-center gap-2 px-5 py-3 border-b border-gray-100"
              style="background: linear-gradient(90deg, #4A1660 0%, #6d28d9 100%);">
@@ -54,7 +53,7 @@
                     </p>
                 </div>
                 @if($requisicion->urgencia === 'urgente')
-                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-red-100 text-red-700">🔴 Urgente</span>
+                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-orange-100 text-orange-700">⚠️ Afecta producción</span>
                 @endif
             </div>
 
@@ -66,10 +65,6 @@
                 <div>
                     <dt class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Centro de costos</dt>
                     <dd class="font-semibold text-gray-800">{{ $requisicion->centroCostoRef?->nombre ?? '—' }}</dd>
-                </div>
-                <div>
-                    <dt class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Urgencia</dt>
-                    <dd class="font-semibold text-gray-800 capitalize">{{ $requisicion->urgencia }}</dd>
                 </div>
                 <div>
                     <dt class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Tipo</dt>
@@ -102,16 +97,14 @@
                 </svg>
                 <h3 class="text-xs font-bold tracking-widest text-white uppercase">Partidas</h3>
             </div>
-            <span class="text-[10px] text-white/50">
-                ✎ Campos editables por Compras
-            </span>
+            <span class="text-[10px] text-white/50">✎ Campos editables por Compras</span>
         </div>
 
         <div class="divide-y divide-gray-50">
             @foreach($items as $i => $row)
             <div wire:key="item-{{ $i }}" class="p-5 space-y-4">
 
-                {{-- Número + info base del solicitante --}}
+                {{-- Info base del solicitante (solo lectura) --}}
                 <div class="flex items-start gap-3">
                     <span class="inline-flex items-center justify-center w-6 h-6 text-xs font-bold text-white rounded-full shrink-0"
                           style="background: linear-gradient(135deg, #4A1660, #7c3aed);">
@@ -125,41 +118,36 @@
                         <div>
                             <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Cantidad / Unidad</p>
                             <p class="font-semibold text-gray-800">
-                                {{ rtrim(rtrim(number_format($row['cantidad'], 3, '.', ''), '0'), '.') }}
-                                {{ $row['unidad_label'] ?? '' }}
+                                {{ (int) $row['cantidad'] }} {{ $row['unidad_label'] ?? '' }}
                             </p>
                         </div>
-                        @if($row['link_compra'])
+                        @if(!empty($row['link_compra']))
                         <div>
                             <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Link referencia</p>
                             <a href="{{ $row['link_compra'] }}" target="_blank"
-                               class="text-xs text-indigo-500 hover:underline truncate block max-w-[150px]">
-                                Ver link →
-                            </a>
+                               class="text-xs text-indigo-500 hover:underline truncate block max-w-[150px]">Ver link →</a>
                         </div>
                         @endif
                     </div>
                 </div>
 
-                {{-- Campos editables --}}
+                {{-- Campos editables por Compras --}}
                 <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
+                    {{-- Precio --}}
                     <div>
-                        <label class="block mb-1 text-[10px] font-bold text-violet-500 uppercase tracking-wider">
-                            Precio unitario ✎
-                        </label>
+                        <label class="block mb-1 text-[10px] font-bold text-violet-500 uppercase tracking-wider">Precio unitario ✎</label>
                         <div class="relative">
                             <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-300 text-xs font-bold">$</span>
                             <input type="number" step="0.01" min="0"
-                                   wire:model.debounce.400ms="items.{{ $i }}.precio_unitario"
+                                   wire:model.live="items.{{ $i }}.precio_unitario"
                                    class="w-full pl-6 text-sm text-right border-gray-200 rounded-lg shadow-sm focus:ring-violet-500 focus:border-violet-500">
                         </div>
                     </div>
 
+                    {{-- Impuesto --}}
                     <div>
-                        <label class="block mb-1 text-[10px] font-bold text-violet-500 uppercase tracking-wider">
-                            Impuesto ✎
-                        </label>
-                        <select wire:model="items.{{ $i }}.tipo_impuesto_id"
+                        <label class="block mb-1 text-[10px] font-bold text-violet-500 uppercase tracking-wider">Impuesto ✎</label>
+                        <select wire:model.live="items.{{ $i }}.tipo_impuesto_id"
                                 class="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-violet-500 focus:border-violet-500">
                             <option value="">Sin impuesto</option>
                             @foreach($tipos_impuesto as $ti)
@@ -168,34 +156,74 @@
                         </select>
                     </div>
 
+                    {{-- Método de pago por partida ✎ --}}
                     <div>
-                        <label class="block mb-1 text-[10px] font-bold text-violet-500 uppercase tracking-wider">
-                            Proveedor ✎
-                        </label>
-                        <input type="text" wire:model.lazy="items.{{ $i }}.proveedor_sugerido"
+                        <label class="block mb-1 text-[10px] font-bold text-violet-500 uppercase tracking-wider">Método de pago ✎</label>
+                        <select wire:model.live="items.{{ $i }}.metodo_pago"
+                                class="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-violet-500 focus:border-violet-500">
+                            <option value="">— Sin asignar —</option>
+                            <option value="transferencia">🏦 Transferencia</option>
+                            <option value="tarjeta">💳 Tarjeta</option>
+                        </select>
+                    </div>
+
+                    {{-- Proveedor --}}
+                    <div>
+                        <label class="block mb-1 text-[10px] font-bold text-violet-500 uppercase tracking-wider">Proveedor ✎</label>
+                        <input type="text" wire:model.live="items.{{ $i }}.proveedor_sugerido"
                                placeholder="Nombre del proveedor"
                                class="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-violet-500 focus:border-violet-500">
                     </div>
+                </div>
 
-                    {{-- Mini totales --}}
-                    <div class="flex flex-col justify-end">
-                        <div class="px-3 py-2 space-y-1 text-xs border rounded-xl border-violet-100 bg-violet-50/50">
-                            <div class="flex justify-between text-gray-400">
-                                <span>Subtotal</span>
-                                <span>${{ number_format($row['subtotal'] ?? 0, 2) }}</span>
-                            </div>
-                            @if(($row['monto_impuesto'] ?? 0) > 0)
-                            <div class="flex justify-between text-gray-400">
-                                <span>Impuesto</span>
-                                <span>${{ number_format($row['monto_impuesto'] ?? 0, 2) }}</span>
-                            </div>
-                            @endif
-                            <div class="flex justify-between pt-1 font-bold border-t border-violet-200" style="color: #4A1660">
-                                <span>Total</span>
-                                <span>${{ number_format($row['total_item'] ?? 0, 2) }}</span>
-                            </div>
+                {{-- Mini totales + retenciones --}}
+                <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    {{-- Totales de la partida --}}
+                    <div class="px-3 py-2 space-y-1 text-xs border rounded-xl border-violet-100 bg-violet-50/50">
+                        <div class="flex justify-between text-gray-400">
+                            <span>Subtotal</span>
+                            <span>${{ number_format($row['subtotal'] ?? 0, 2) }}</span>
+                        </div>
+                        @if(($row['monto_impuesto'] ?? 0) > 0)
+                        <div class="flex justify-between text-gray-400">
+                            <span>Impuesto</span>
+                            <span>${{ number_format($row['monto_impuesto'] ?? 0, 2) }}</span>
+                        </div>
+                        @endif
+                        <div class="flex justify-between pt-1 font-bold border-t border-violet-200" style="color: #4A1660">
+                            <span>Total</span>
+                            <span>${{ number_format($row['total_item'] ?? 0, 2) }}</span>
                         </div>
                     </div>
+
+                    {{-- Retenciones (solo lectura — las puso el solicitante) --}}
+                    @if($requisicion->es_pago_factura && !empty($row['retenciones_ids']))
+                    <div class="px-3 py-2 space-y-1 text-xs border rounded-xl border-rose-100 bg-rose-50/40">
+                        <p class="text-[10px] font-bold text-rose-500 uppercase tracking-wider mb-1">Retenciones del solicitante</p>
+                        @foreach($row['retenciones_ids'] as $retId)
+                            @php
+                                $retInfo = collect($tipos_retencion ?? [])->firstWhere('id', $retId);
+                                $montoRet = $retInfo ? round(($row['subtotal'] ?? 0) * ($retInfo['porcentaje'] / 100), 2) : 0;
+                            @endphp
+                            @if($retInfo)
+                            <div class="flex justify-between text-rose-600">
+                                <span>{{ $retInfo['nombre'] }}</span>
+                                <span>- ${{ number_format($montoRet, 2) }}</span>
+                            </div>
+                            @endif
+                        @endforeach
+                        @if(($row['monto_retenciones'] ?? 0) > 0)
+                        <div class="flex justify-between pt-1 font-bold border-t border-rose-200 text-rose-700">
+                            <span>Total retenciones</span>
+                            <span>- ${{ number_format($row['monto_retenciones'], 2) }}</span>
+                        </div>
+                        <div class="flex justify-between font-bold text-gray-700">
+                            <span>Neto a pagar</span>
+                            <span>${{ number_format($row['total_neto'] ?? 0, 2) }}</span>
+                        </div>
+                        @endif
+                    </div>
+                    @endif
                 </div>
 
                 {{-- Archivos --}}
@@ -213,7 +241,6 @@
                                class="text-indigo-500 hover:underline max-w-[140px] truncate">
                                 {{ $arch['nombre_original'] }}
                             </a>
-                            <span class="text-gray-300">{{ $arch['tipo_label'] }}</span>
                             <button type="button" wire:click="removeArchivoExistente({{ $i }}, {{ $arch['id'] }})"
                                     class="ml-1 text-gray-300 transition-colors hover:text-red-500">
                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
@@ -263,6 +290,22 @@
                     <span class="font-bold text-gray-800">Total</span>
                     <span class="text-xl font-black" style="color: #4A1660">${{ number_format($total, 2) }}</span>
                 </div>
+                @if($requisicion->es_pago_factura)
+                @php
+                    $totalRet = collect($items)->sum(fn($r) => (float)($r['monto_retenciones'] ?? 0));
+                    $totalNeto = collect($items)->sum(fn($r) => (float)($r['total_neto'] ?? $r['total_item'] ?? 0));
+                @endphp
+                @if($totalRet > 0)
+                <div class="flex justify-between text-sm text-rose-600 pt-1 border-t border-rose-100">
+                    <span>Retenciones</span>
+                    <span class="font-semibold">- ${{ number_format($totalRet, 2) }}</span>
+                </div>
+                <div class="flex justify-between font-bold text-gray-800">
+                    <span>Total neto a pagar</span>
+                    <span class="text-lg" style="color: #4A1660">${{ number_format($totalNeto, 2) }}</span>
+                </div>
+                @endif
+                @endif
             </div>
         </div>
     </div>
@@ -274,18 +317,17 @@
             <h3 class="text-xs font-bold tracking-widest uppercase text-violet-700">Información de Compras</h3>
         </div>
         <div class="p-5 space-y-4">
-            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div>
-                    <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Método de pago</label>
-                    <select wire:model="metodo_pago"
-                            class="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-violet-500 focus:border-violet-500">
-                        <option value="">— Sin asignar —</option>
-                        <option value="tarjeta">💳 Tarjeta</option>
-                        <option value="transferencia">🏦 Transferencia</option>
-                    </select>
-                </div>
+            <div>
+                <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    Método de pago general
+                </label>
+                <select wire:model.live="metodo_pago"
+                        class="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-violet-500 focus:border-violet-500">
+                    <option value="">— Sin asignar —</option>
+                    <option value="tarjeta">💳 Tarjeta</option>
+                    <option value="transferencia">🏦 Transferencia</option>
+                </select>
             </div>
-
             <div>
                 <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                     Observaciones de compras
@@ -306,7 +348,7 @@
                     <span wire:loading.remove wire:target="guardarCambios">Guardar cambios</span>
                     <span wire:loading wire:target="guardarCambios">Guardando…</span>
                 </button>
-                <p class="text-xs text-gray-400">Guarda sin cambiar el estado de la requisición.</p>
+                <p class="text-xs text-gray-400">Guarda sin cambiar el estado.</p>
             </div>
         </div>
     </div>
@@ -339,10 +381,8 @@
                     </p>
                     <button type="button" wire:click="aprobarRevision"
                             wire:loading.attr="disabled" wire:target="aprobarRevision"
-                            class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 shadow-md hover:shadow-lg transition-all disabled:opacity-50">
-                        <span wire:loading.remove wire:target="aprobarRevision">
-                            ✅ Aprobar y enviar a aprobaciones
-                        </span>
+                            class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 shadow-md transition disabled:opacity-50">
+                        <span wire:loading.remove wire:target="aprobarRevision">✅ Aprobar y enviar a aprobaciones</span>
                         <span wire:loading wire:target="aprobarRevision" class="flex items-center gap-2">
                             <svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
@@ -368,7 +408,7 @@
 
                     @if(!$mostrarFormRechazo)
                     <button type="button" wire:click="toggleFormRechazo"
-                            class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-white bg-rose-600 rounded-xl hover:bg-rose-700 shadow-md hover:shadow-lg transition-all">
+                            class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-white bg-rose-600 rounded-xl hover:bg-rose-700 shadow-md transition">
                         ❌ Rechazar requisición
                     </button>
                     @else

@@ -353,6 +353,56 @@
                         </div>
                     </div>
                 </div>
+                {{-- Retenciones — solo visible si es pago de factura --}}
+                @if($es_pago_factura && count($tipos_retencion) > 0)
+                <div class="rounded-xl border border-rose-100 bg-rose-50/40 p-4 space-y-3">
+                
+                    <div class="flex items-center gap-2">
+                        <svg class="w-4 h-4 text-rose-500 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2zM10 8.5a.5.5 0 11-1 0 .5.5 0 011 0zm5 5a.5.5 0 11-1 0 .5.5 0 011 0z"/>
+                        </svg>
+                        <span class="text-xs font-bold text-rose-700 uppercase tracking-wider">Retenciones</span>
+                        <span class="text-xs text-rose-400 font-normal">Revisa el pdf que adjuntas para verificar las retenciones</span>
+                    </div>
+                
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                        @foreach($tipos_retencion as $ret)
+                        <label class="flex items-start gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-colors
+                                    {{ in_array($ret['id'], $row['retenciones_ids'] ?? [])
+                                        ? 'border-rose-300 bg-rose-50'
+                                        : 'border-gray-200 bg-white hover:border-rose-200 hover:bg-rose-50/50' }}">
+                            <input type="checkbox"
+                                wire:model.live="items.{{ $i }}.retenciones_ids"
+                                value="{{ $ret['id'] }}"
+                                class="mt-0.5 w-4 h-4 text-rose-600 border-gray-300 rounded focus:ring-rose-500 shrink-0">
+                            <div class="min-w-0">
+                                <p class="text-xs font-semibold text-gray-800 leading-tight">{{ $ret['nombre'] }}</p>
+                                <p class="text-[10px] text-gray-400 mt-0.5">{{ number_format($ret['porcentaje'], 3) }}% sobre subtotal</p>
+                                @if(in_array($ret['id'], $row['retenciones_ids'] ?? []) && ($row['subtotal'] ?? 0) > 0)
+                                    @php $montoRetCalc = round(($row['subtotal'] ?? 0) * ($ret['porcentaje'] / 100), 2); @endphp
+                                    <p class="text-[10px] font-semibold text-rose-600 mt-0.5">= ${{ number_format($montoRetCalc, 2) }}</p>
+                                @endif
+                            </div>
+                        </label>
+                        @endforeach
+                    </div>
+                
+                    {{-- Resumen de retenciones de esta partida --}}
+                    @if(($row['monto_retenciones'] ?? 0) > 0)
+                    <div class="flex items-center justify-between pt-2 border-t border-rose-100 text-sm">
+                        <span class="text-xs text-rose-600 font-medium">Total retenciones esta partida:</span>
+                        <span class="font-bold text-rose-700">- ${{ number_format($row['monto_retenciones'], 2) }}</span>
+                    </div>
+                    <div class="flex items-center justify-between text-sm">
+                        <span class="text-xs text-gray-600 font-medium">Total neto a pagar esta partida:</span>
+                        <span class="font-bold text-gray-800">${{ number_format($row['total_neto'] ?? 0, 2) }}</span>
+                    </div>
+                    @endif
+                
+                </div>
+                @endif
+                
+
 
                 {{-- Link --}}
                 <div class="grid grid-cols-12 gap-3">
@@ -505,8 +555,19 @@
                 <span class="font-bold text-gray-800">Total</span>
                 <span class="text-xl font-black" style="color: #4A1660">${{ number_format($total, 2) }}</span>
             </div>
+            @if($es_pago_factura && $total_retenciones > 0)
+            <div class="flex justify-between text-sm text-rose-600 pt-1 border-t border-rose-100">
+                <span>Retenciones</span>
+                <span class="font-semibold">- ${{ number_format($total_retenciones, 2) }}</span>
+            </div>
+            <div class="flex justify-between font-bold text-gray-900">
+                <span>Total neto a pagar</span>
+                <span class="text-lg" style="color: #4A1660">${{ number_format($total_neto, 2) }}</span>
+            </div>
+            @endif
         </div>
     </div>
+
 
     {{-- ══ ACCIONES ══════════════════════════════════════════════════════ --}}
     <div class="flex items-center justify-end gap-3 pb-6">

@@ -77,13 +77,10 @@
         </div>
     </x-slot>
 
-    {{-- Fondo con textura sutil --}}
     <div class="min-h-screen py-6" style="background: linear-gradient(160deg, #f8f5ff 0%, #f1f5f9 50%, #f8f5ff 100%);">
         <div class="max-w-5xl px-4 mx-auto space-y-4 sm:px-6 lg:px-8">
 
             {{-- ══ BANNERS DE ESTADO ════════════════════════════════════ --}}
-
-            {{-- Leyenda responsabilidad --}}
             <div class="flex items-start gap-3 px-4 py-3 rounded-xl border border-amber-200/80 bg-amber-50/80 backdrop-blur-sm">
                 <svg class="w-4 h-4 text-amber-500 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                     <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
@@ -93,7 +90,6 @@
                 </p>
             </div>
 
-            {{-- Rechazada por compras --}}
             @if($requisicion->estado === 'rechazada_compras')
                 <div class="rounded-xl border border-orange-200 bg-orange-50 overflow-hidden">
                     <div class="flex items-center gap-2 px-4 py-2 bg-orange-100 border-b border-orange-200">
@@ -118,7 +114,6 @@
                 </div>
             @endif
 
-            {{-- En revisión --}}
             @if($requisicion->estado === 'en_revision_compras')
                 <div class="flex items-center gap-3 px-4 py-3 rounded-xl border border-violet-200 bg-violet-50">
                     <div class="flex items-center justify-center w-7 h-7 rounded-full bg-violet-100 shrink-0">
@@ -133,7 +128,6 @@
                 </div>
             @endif
 
-            {{-- Pendiente de cierre --}}
             @if($requisicion->estado === 'pendiente_cierre')
                 <div class="flex items-center justify-between px-4 py-3 rounded-xl border border-cyan-200 bg-cyan-50">
                     <div class="flex items-center gap-3">
@@ -202,8 +196,9 @@
                                         'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold border',
                                         'bg-blue-50 text-blue-700 border-blue-200'       => $requisicion->metodo_pago === 'transferencia',
                                         'bg-purple-50 text-purple-700 border-purple-200' => $requisicion->metodo_pago === 'tarjeta',
+                                        'bg-green-50 text-green-700 border-green-200'    => $requisicion->metodo_pago === 'efectivo',
                                     ])>
-                                        {{ $requisicion->metodo_pago === 'tarjeta' ? '💳' : '🏦' }}
+                                        {{ match($requisicion->metodo_pago) { 'tarjeta' => '💳', 'transferencia' => '🏦', 'efectivo' => '💵', default => '' } }}
                                         {{ ucfirst($requisicion->metodo_pago) }}
                                     </span>
                                 @else
@@ -306,6 +301,10 @@
             @endrole
 
             {{-- ══ PARTIDAS ════════════════════════════════════════════ --}}
+            @php
+                $hayRetenciones = $requisicion->es_pago_factura &&
+                    $requisicion->items->sum(fn($it) => (float)($it->monto_retenciones ?? 0)) > 0;
+            @endphp
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <div class="flex items-center gap-2 px-5 py-3 border-b border-gray-100"
                      style="background: linear-gradient(90deg, #4A1660 0%, #6d28d9 100%);">
@@ -326,6 +325,9 @@
                                 <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-400 uppercase tracking-wider">P. Unit.</th>
                                 <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-400 uppercase tracking-wider">Subtotal</th>
                                 <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-400 uppercase tracking-wider">Impuesto</th>
+                                @if($hayRetenciones)
+                                <th class="px-4 py-3 text-right text-[10px] font-bold text-rose-400 uppercase tracking-wider">Retenciones</th>
+                                @endif
                                 <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total</th>
                             </tr>
                         </thead>
@@ -344,6 +346,20 @@
                                                 link
                                             </a>
                                         @endif
+                                        {{-- Método de pago por partida (solo compras/admin) --}}
+                                        @role('administrador|compras')
+                                        @if($it->metodo_pago)
+                                            <span @class([
+                                                'ml-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold',
+                                                'bg-blue-50 text-blue-600'   => $it->metodo_pago === 'transferencia',
+                                                'bg-purple-50 text-purple-600' => $it->metodo_pago === 'tarjeta',
+                                                'bg-green-50 text-green-600'  => $it->metodo_pago === 'efectivo',
+                                            ])>
+                                                {{ match($it->metodo_pago) { 'tarjeta' => '💳', 'transferencia' => '🏦', 'efectivo' => '💵', default => '' } }}
+                                                {{ ucfirst($it->metodo_pago) }}
+                                            </span>
+                                        @endif
+                                        @endrole
                                     </td>
                                     <td class="px-4 py-3 text-gray-500 text-xs">{{ $it->unidad_label }}</td>
                                     <td class="px-4 py-3 text-gray-600 text-xs">{{ $it->proveedor_sugerido ?: '—' }}</td>
@@ -377,16 +393,54 @@
                                             <span class="text-gray-300 text-xs">—</span>
                                         @endif
                                     </td>
-                                    <td class="px-4 py-3 text-right font-bold text-gray-800 text-sm">
-                                        ${{ number_format($it->total_item ?: $it->subtotal, 2) }}
+
+                                    {{-- Columna retenciones — solo si la requisición tiene retenciones --}}
+                                    @if($hayRetenciones)
+                                    <td class="px-4 py-3 text-right">
+                                        @if(($it->monto_retenciones ?? 0) > 0)
+                                            <div class="text-xs font-semibold text-rose-600">
+                                                - ${{ number_format($it->monto_retenciones, 2) }}
+                                            </div>
+                                            {{-- Detalle de cada retención --}}
+                                            @foreach($it->retenciones as $ret)
+                                                @if($ret->tipoRetencion)
+                                                <div class="text-[10px] text-rose-400 mt-0.5">
+                                                    {{ $ret->tipoRetencion->nombre }}
+                                                </div>
+                                                @endif
+                                            @endforeach
+                                        @else
+                                            <span class="text-gray-300 text-xs">—</span>
+                                        @endif
+                                    </td>
+                                    @endif
+
+                                    {{-- Total: si hay retenciones muestra total_neto, si no total_item --}}
+                                    <td class="px-4 py-3 text-right text-sm">
+                                        @if(($it->monto_retenciones ?? 0) > 0)
+                                            <div class="font-bold text-gray-800">
+                                                ${{ number_format($it->total_neto, 2) }}
+                                            </div>
+                                            <div class="text-[10px] text-gray-400">neto</div>
+                                        @else
+                                            <span class="font-bold text-gray-800">
+                                                ${{ number_format($it->total_item ?: $it->subtotal, 2) }}
+                                            </span>
+                                        @endif
                                     </td>
                                 </tr>
                             @empty
-                                <tr><td colspan="9" class="px-4 py-8 text-center text-gray-400 text-sm">Sin partidas registradas.</td></tr>
+                                <tr>
+                                    <td colspan="{{ $hayRetenciones ? 10 : 9 }}"
+                                        class="px-4 py-8 text-center text-gray-400 text-sm">
+                                        Sin partidas registradas.
+                                    </td>
+                                </tr>
                             @endforelse
                         </tbody>
                     </table>
                 </div>
+
                 {{-- Totales --}}
                 <div class="flex justify-end px-5 py-4 border-t border-gray-100 bg-gray-50">
                     <div class="w-full max-w-xs space-y-2">
@@ -402,6 +456,20 @@
                             <span class="font-bold text-gray-800">Total</span>
                             <span class="text-lg font-bold" style="color: #4A1660">${{ number_format($requisicion->total, 2) }}</span>
                         </div>
+                        @if($hayRetenciones)
+                        @php
+                            $totalRet  = $requisicion->items->sum(fn($it) => (float)($it->monto_retenciones ?? 0));
+                            $totalNeto = $requisicion->items->sum(fn($it) => (float)($it->total_neto ?? $it->total_item ?? 0));
+                        @endphp
+                        <div class="flex justify-between text-sm text-rose-600 pt-1 border-t border-rose-100">
+                            <span>Retenciones</span>
+                            <span class="font-semibold">- ${{ number_format($totalRet, 2) }}</span>
+                        </div>
+                        <div class="flex justify-between font-bold text-gray-900 text-base">
+                            <span>Total neto a pagar</span>
+                            <span style="color: #4A1660">${{ number_format($totalNeto, 2) }}</span>
+                        </div>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -420,20 +488,17 @@
                         <p class="text-sm text-gray-400 text-center py-4">Sin registros de aprobación aún.</p>
                     @else
                     <div class="relative">
-                        {{-- Línea conectora --}}
                         @if($requisicion->aprobaciones->count() > 1)
                         <div class="absolute left-3.5 top-6 bottom-6 w-px bg-gray-200"></div>
                         @endif
-
                         <ul class="space-y-4">
                             @foreach($requisicion->aprobaciones->sortBy(fn($a) => $a->nivel?->orden ?? 999) as $ap)
                                 <li class="flex items-start gap-4 relative">
-                                    {{-- Indicador --}}
                                     <div @class([
                                         'flex items-center justify-center w-7 h-7 rounded-full shrink-0 z-10 border-2',
-                                        'bg-amber-100 border-amber-300'   => $ap->estado === 'pendiente',
+                                        'bg-amber-100 border-amber-300'     => $ap->estado === 'pendiente',
                                         'bg-emerald-100 border-emerald-400' => $ap->estado === 'aprobada',
-                                        'bg-rose-100 border-rose-400'     => $ap->estado === 'rechazada',
+                                        'bg-rose-100 border-rose-400'       => $ap->estado === 'rechazada',
                                     ])>
                                         @if($ap->estado === 'aprobada')
                                             <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
@@ -443,7 +508,6 @@
                                             <div class="w-2 h-2 rounded-full bg-amber-400"></div>
                                         @endif
                                     </div>
-
                                     <div class="flex-1 flex items-start justify-between gap-4 min-w-0">
                                         <div class="min-w-0">
                                             <p class="text-sm font-semibold text-gray-800">{{ $ap->nivel?->nombre ?? '—' }}</p>
@@ -459,9 +523,9 @@
                                         </div>
                                         <span @class([
                                             'inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold shrink-0',
-                                            'bg-amber-100 text-amber-700'   => $ap->estado === 'pendiente',
+                                            'bg-amber-100 text-amber-700'     => $ap->estado === 'pendiente',
                                             'bg-emerald-100 text-emerald-700' => $ap->estado === 'aprobada',
-                                            'bg-rose-100 text-rose-700'     => $ap->estado === 'rechazada',
+                                            'bg-rose-100 text-rose-700'       => $ap->estado === 'rechazada',
                                         ])>{{ ucfirst($ap->estado) }}</span>
                                     </div>
                                 </li>

@@ -7,6 +7,7 @@ use App\Models\Requisicion;
 use App\Models\RequisicionItem;
 use App\Models\RequisicionItemArchivo;
 use App\Models\TipoImpuesto;
+use App\Models\TipoRetencion;
 use App\Models\UnidadMedida;
 use App\Models\User;
 use App\Notifications\RequisicionRechazadaPorCompras;
@@ -28,16 +29,17 @@ class RevisarRequisicion extends Component
     public Requisicion $requisicion;
 
     // ── Campos editables por compras ──────────────────────────────────────
-    public string  $observaciones_compras  = '';
-    public string  $motivo_rechazo         = '';
-    public ?string $metodo_pago            = null;
+    public string  $observaciones_compras = '';
+    public string  $motivo_rechazo        = '';
+    public ?string $metodo_pago           = null;
 
-    // Partidas editables (precio, impuesto, proveedor)
-    public array $items          = [];
+    // Partidas editables
+    public array $items           = [];
     public array $archivos_nuevos = [];
 
     // Catálogos
     public array $tipos_impuesto  = [];
+    public array $tipos_retencion = [];
     public array $unidades_medida = [];
 
     // Totales recalculados
@@ -50,16 +52,9 @@ class RevisarRequisicion extends Component
 
     public function mount(Requisicion $requisicion): void
     {
-        // Solo compras y admin pueden acceder
         abort_unless(Auth::user()->hasAnyRole(['compras', 'administrador']), 403);
-
-        // Solo se puede revisar si está en revisión o aprobada por compras (para seguir editando)
         abort_unless(
-            in_array($requisicion->estado, [
-                'en_revision_compras',
-                'aprobada_compras',
-                'en_aprobacion',  // compras puede ver aunque ya esté en flujo
-            ]),
+            in_array($requisicion->estado, ['en_revision_compras', 'aprobada_compras', 'en_aprobacion']),
             403
         );
 
@@ -70,12 +65,12 @@ class RevisarRequisicion extends Component
             'items.unidadMedida',
             'items.tipoImpuesto',
             'items.archivos',
+            'items.retenciones',
             'aprobaciones.nivel',
             'aprobaciones.aprobador',
         ]);
 
-        $this->requisicion = $requisicion;
-
+        $this->requisicion           = $requisicion;
         $this->observaciones_compras = $requisicion->observaciones_compras ?? '';
         $this->metodo_pago           = $requisicion->metodo_pago;
 
@@ -88,6 +83,15 @@ class RevisarRequisicion extends Component
                 'porcentaje' => (float) $t->porcentaje,
             ])->toArray();
 
+        $this->tipos_retencion = TipoRetencion::activos()
+            ->get(['id', 'nombre', 'clave', 'porcentaje'])
+            ->map(fn($r) => [
+                'id'         => $r->id,
+                'nombre'     => $r->nombre,
+                'clave'      => $r->clave,
+                'porcentaje' => (float) $r->porcentaje,
+            ])->toArray();
+
         $this->unidades_medida = UnidadMedida::activas()
             ->get(['id', 'nombre', 'abreviatura'])
             ->map(fn($u) => [
@@ -96,28 +100,30 @@ class RevisarRequisicion extends Component
                 'abreviatura' => $u->abreviatura,
             ])->toArray();
 
-        // Cargar partidas editables
         $this->items = $requisicion->items->map(function ($it) {
             return [
                 'id'                   => $it->id,
                 'descripcion'          => $it->descripcion,
                 'unidad_label'         => $it->unidad_label,
-                'cantidad'             => (float) $it->cantidad,
+                'cantidad'             => (int) $it->cantidad,
                 'precio_unitario'      => (float) $it->precio_unitario,
                 'subtotal'             => (float) $it->subtotal,
                 'tipo_impuesto_id'     => $it->tipo_impuesto_id,
                 'monto_impuesto'       => (float) $it->monto_impuesto,
                 'total_item'           => (float) $it->total_item,
+                'metodo_pago'          => $it->metodo_pago ?? '',
+                // Retenciones — solo lectura para compras
+                'retenciones_ids'      => $it->retenciones->pluck('tipo_retencion_id')->toArray(),
+                'monto_retenciones'    => (float) ($it->monto_retenciones ?? 0),
+                'total_neto'           => (float) ($it->total_neto ?? $it->total_item ?? 0),
                 'link_compra'          => $it->link_compra,
                 'proveedor_sugerido'   => $it->proveedor_sugerido,
                 'archivos_existentes'  => $it->archivos->map(fn($a) => [
                     'id'              => $a->id,
                     'nombre_original' => $a->nombre_original,
                     'tipo'            => $a->tipo,
-                    'tipo_label'      => $a->tipo_label,
                     'url'             => Storage::disk('public')->url($a->path),
                     'icono'           => $a->icono,
-                    'tamanio'         => $a->tamanio_formateado,
                 ])->toArray(),
                 'ficha_tecnica_path'   => $it->ficha_tecnica_path,
                 'ficha_tecnica_nombre' => $it->ficha_tecnica_nombre,
@@ -133,7 +139,7 @@ class RevisarRequisicion extends Component
         return view('livewire.requisiciones.revisar-requisicion');
     }
 
-    // ─── Recálculo de totales ─────────────────────────────────────────────
+    // ─── Recálculo ────────────────────────────────────────────────────────
 
     public function updatedItems(): void
     {
@@ -158,6 +164,10 @@ class RevisarRequisicion extends Component
             $this->items[$i]['subtotal']       = $sub;
             $this->items[$i]['monto_impuesto'] = $montoImp;
             $this->items[$i]['total_item']     = round($sub + $montoImp, 2);
+
+            // Recalcular total_neto respetando retenciones existentes
+            $montoRet = (float) ($row['monto_retenciones'] ?? 0);
+            $this->items[$i]['total_neto'] = round($sub + $montoImp - $montoRet, 2);
 
             $subtotalGeneral += $sub;
             $impuestoGeneral += $montoImp;
@@ -189,25 +199,25 @@ class RevisarRequisicion extends Component
         );
     }
 
-    // ─── Guardar cambios (sin cambiar estado) ─────────────────────────────
+    // ─── Guardar cambios ──────────────────────────────────────────────────
 
     public function guardarCambios(): void
     {
         $this->validate([
-            'observaciones_compras'      => ['nullable', 'string', 'max:2000'],
-            'metodo_pago'                => ['nullable', 'in:tarjeta,transferencia'],
-            'items.*.precio_unitario'    => ['required', 'numeric', 'gte:0'],
-            'items.*.tipo_impuesto_id'   => ['nullable', 'exists:tipos_impuesto,id'],
-            'items.*.proveedor_sugerido' => ['nullable', 'string', 'max:255'],
-            'items.*.link_compra'        => ['nullable', 'string', 'max:500'],
-            'archivos_nuevos.*.*'        => ['nullable', 'file', 'max:10240',
-                                             'mimes:pdf,jpg,jpeg,png,doc,docx,xls,xlsx'],
+            'observaciones_compras'       => ['nullable', 'string', 'max:2000'],
+            'metodo_pago'                 => ['nullable', 'in:transferencia,tarjeta,efectivo'],
+            'items.*.precio_unitario'     => ['required', 'numeric', 'gte:0'],
+            'items.*.tipo_impuesto_id'    => ['nullable', 'exists:tipos_impuesto,id'],
+            'items.*.proveedor_sugerido'  => ['nullable', 'string', 'max:255'],
+            'items.*.link_compra'         => ['nullable', 'string', 'max:2000'],
+            'items.*.metodo_pago'         => ['nullable', 'in:transferencia,tarjeta,efectivo'],
+            'archivos_nuevos.*.*'         => ['nullable', 'file', 'max:10240',
+                                              'mimes:pdf,jpg,jpeg,png,doc,docx,xls,xlsx'],
         ]);
 
         $this->recalcularTotales();
 
         DB::transaction(function () {
-            // Actualizar cabecera
             $this->requisicion->update([
                 'observaciones_compras' => $this->observaciones_compras ?: null,
                 'metodo_pago'           => $this->metodo_pago,
@@ -216,7 +226,6 @@ class RevisarRequisicion extends Component
                 'total'                 => $this->total,
             ]);
 
-            // Actualizar partidas (solo campos que compras puede tocar)
             foreach ($this->items as $i => $row) {
                 $item = RequisicionItem::find($row['id']);
                 if (!$item) continue;
@@ -229,33 +238,32 @@ class RevisarRequisicion extends Component
                     'subtotal'           => (float) ($row['subtotal'] ?? 0),
                     'proveedor_sugerido' => $row['proveedor_sugerido'] ?: null,
                     'link_compra'        => $row['link_compra'] ?: null,
+                    'metodo_pago'        => $row['metodo_pago'] ?: null,
+                    // Recalcular total_neto con el nuevo precio pero mismas retenciones
+                    'total_neto'         => (float) ($row['total_neto'] ?? $row['total_item'] ?? 0),
                 ]);
 
-                // Guardar nuevos archivos
                 $this->guardarArchivosNuevos($item, $i, $row['archivos_existentes'] ?? []);
             }
 
-            // Limpiar archivos temporales
             $this->archivos_nuevos = array_fill(0, count($this->items), []);
         });
 
         session()->flash('status_compras', 'Cambios guardados correctamente.');
     }
 
-    // ─── Aprobar revisión de compras ──────────────────────────────────────
+    // ─── Aprobar revisión ─────────────────────────────────────────────────
 
     public function aprobarRevision(): void
     {
         $this->validate([
             'observaciones_compras' => ['nullable', 'string', 'max:2000'],
-            'metodo_pago'           => ['nullable', 'in:tarjeta,transferencia'],
         ]);
 
         try {
             DB::transaction(function () {
                 $this->recalcularTotales();
 
-                // Guardar ajustes finales de compras
                 $this->requisicion->update([
                     'observaciones_compras' => $this->observaciones_compras ?: null,
                     'metodo_pago'           => $this->metodo_pago,
@@ -267,7 +275,6 @@ class RevisarRequisicion extends Component
                     'revisado_en'           => now(),
                 ]);
 
-                // Actualizar partidas
                 foreach ($this->items as $row) {
                     $item = RequisicionItem::find($row['id']);
                     if (!$item) continue;
@@ -280,14 +287,14 @@ class RevisarRequisicion extends Component
                         'subtotal'           => (float) ($row['subtotal'] ?? 0),
                         'proveedor_sugerido' => $row['proveedor_sugerido'] ?: null,
                         'link_compra'        => $row['link_compra'] ?: null,
+                        'metodo_pago'        => $row['metodo_pago'] ?: null,
+                        'total_neto'         => (float) ($row['total_neto'] ?? $row['total_item'] ?? 0),
                     ]);
                 }
 
-                // Crear la cadena de aprobaciones por monto
                 $flujo = app(FlujoAprobacionService::class);
                 $flujo->crearCadenaAprobacion($this->requisicion);
 
-                // Cambiar a en_aprobacion y notificar primer aprobador
                 $this->requisicion->update(['estado' => 'en_aprobacion']);
                 $flujo->notificarSiguiente($this->requisicion->fresh());
             });
@@ -295,17 +302,13 @@ class RevisarRequisicion extends Component
             session()->flash('status', 'Revisión aprobada. La requisición continúa al flujo de aprobaciones.');
             $this->js("window.location.href = '" . route('requisiciones.index') . "'");
 
-        } catch (ValidationException $e) {
-            foreach ($e->errors() as $field => $messages) {
-                $this->addError($field, implode(' ', $messages));
-            }
         } catch (\Exception $e) {
             \Log::error('aprobarRevision error: ' . $e->getMessage());
             $this->addError('general', 'Error al aprobar: ' . $e->getMessage());
         }
     }
 
-    // ─── Rechazar revisión de compras ─────────────────────────────────────
+    // ─── Rechazar revisión ────────────────────────────────────────────────
 
     public function toggleFormRechazo(): void
     {
@@ -331,7 +334,6 @@ class RevisarRequisicion extends Component
             ]);
         });
 
-        // Notificar al solicitante
         optional($this->requisicion->solicitante)
             ->notify(new RequisicionRechazadaPorCompras($this->requisicion, $this->motivo_rechazo));
 
@@ -343,7 +345,7 @@ class RevisarRequisicion extends Component
 
     private function guardarArchivosNuevos(RequisicionItem $item, int $index, array $existentes): void
     {
-        $uploads     = $this->archivos_nuevos[$index] ?? [];
+        $uploads = $this->archivos_nuevos[$index] ?? [];
         if (empty($uploads)) return;
 
         $disponibles = max(0, 5 - count($existentes));

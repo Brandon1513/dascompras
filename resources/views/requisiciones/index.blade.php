@@ -202,26 +202,65 @@
                                         </span>
                                     </td>
 
-                                    @role('administrador|compras')
-                                    <td class="px-4 py-3.5">
-                                        @if($r->metodo_pago)
-                                            <span @class([
-                                                'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold',
-                                                'bg-blue-50 text-blue-700'     => $r->metodo_pago === 'transferencia',
-                                                'bg-purple-50 text-purple-700' => $r->metodo_pago === 'tarjeta',
-                                            ])>
-                                                {{ $r->metodo_pago === 'tarjeta' ? '💳' : '🏦' }}
-                                                {{ ucfirst($r->metodo_pago) }}
-                                            </span>
+                                   @role('administrador|compras')
+<td class="px-4 py-3.5">
+    @php
+        // Método general de la requisición
+        $metodoBadges = [];
+ 
+        if ($r->metodo_pago) {
+            $metodoBadges[$r->metodo_pago] = true;
+        }
+ 
+        // Métodos únicos de las partidas (solo los que difieren o no hay general)
+        foreach ($r->items as $it) {
+            if ($it->metodo_pago) {
+                $metodoBadges[$it->metodo_pago] = true;
+            }
+        }
+ 
+        $iconos = [
+            'transferencia' => '🏦',
+            'tarjeta'       => '💳',
+            'efectivo'      => '💵',
+        ];
+        $colores = [
+            'transferencia' => 'bg-blue-50 text-blue-700',
+            'tarjeta'       => 'bg-purple-50 text-purple-700',
+            'efectivo'      => 'bg-green-50 text-green-700',
+        ];
+    @endphp
+ 
+    @if(count($metodoBadges) > 0)
+        <div class="flex flex-col gap-1">
+            @foreach(array_keys($metodoBadges) as $metodo)
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold
+                             {{ $colores[$metodo] ?? 'bg-gray-50 text-gray-600' }}">
+                    {{ $iconos[$metodo] ?? '' }}
+                    {{ ucfirst($metodo) }}
+                </span>
+            @endforeach
+        </div>
+    @else
+        <span class="text-xs text-gray-300">—</span>
+    @endif
+</td>
+@endrole
+
+
+                                    <td class="px-4 py-3.5 text-right">
+                                        @php
+                                            $tieneRetenciones = $r->es_pago_factura && $r->items->sum('monto_retenciones') > 0;
+                                            $totalNeto = $r->items->sum(fn($it) => (float)($it->total_neto ?? $it->total_item ?? 0));
+                                        @endphp
+                                        @if($tieneRetenciones)
+                                            <div class="font-bold text-gray-800">${{ number_format($totalNeto, 2) }}</div>
+                                            <div class="text-[10px] text-gray-400 text-right">neto</div>
                                         @else
-                                            <span class="text-xs text-gray-300">—</span>
+                                            <span class="font-bold text-gray-800">${{ number_format($r->total, 2) }}</span>
                                         @endif
                                     </td>
-                                    @endrole
 
-                                    <td class="px-4 py-3.5 text-right font-bold text-gray-800">
-                                        ${{ number_format($r->total, 2) }}
-                                    </td>
 
                                     {{-- Acciones --}}
                                     <td class="px-4 py-3.5 text-right">

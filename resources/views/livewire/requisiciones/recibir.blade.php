@@ -57,6 +57,10 @@
     </div>
 
     {{-- ══ PARTIDAS ════════════════════════════════════════════════════ --}}
+    @php
+        $hayRetenciones = $requisicion->es_pago_factura &&
+            $requisicion->items->sum(fn($it) => (float)($it->monto_retenciones ?? 0)) > 0;
+    @endphp
     <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-xl">
         <div class="flex items-center gap-2 px-5 py-3 border-b border-gray-100"
              style="background: linear-gradient(90deg, #4A1660 0%, #6d28d9 100%);">
@@ -76,6 +80,9 @@
                         <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-400 uppercase tracking-wider">P. Unit.</th>
                         <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-400 uppercase tracking-wider">Subtotal</th>
                         <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-400 uppercase tracking-wider">Impuesto</th>
+                        @if($hayRetenciones)
+                        <th class="px-4 py-3 text-right text-[10px] font-bold text-rose-400 uppercase tracking-wider">Retenciones</th>
+                        @endif
                         <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total</th>
                     </tr>
                 </thead>
@@ -101,12 +108,33 @@
                                     <span class="text-gray-300 text-xs">—</span>
                                 @endif
                             </td>
-                            <td class="px-4 py-3 text-right font-bold text-gray-800 text-sm">
-                                ${{ number_format($it->total_item ?: $it->subtotal, 2) }}
+                            @if($hayRetenciones)
+                            <td class="px-4 py-3 text-right">
+                                @if(($it->monto_retenciones ?? 0) > 0)
+                                    <div class="text-xs font-semibold text-rose-600">
+                                        - ${{ number_format($it->monto_retenciones, 2) }}
+                                    </div>
+                                    @foreach($it->retenciones as $ret)
+                                        @if($ret->tipoRetencion)
+                                        <div class="text-[10px] text-rose-400 mt-0.5">{{ $ret->tipoRetencion->nombre }}</div>
+                                        @endif
+                                    @endforeach
+                                @else
+                                    <span class="text-gray-300 text-xs">—</span>
+                                @endif
+                            </td>
+                            @endif
+                            <td class="px-4 py-3 text-right text-sm">
+                                @if(($it->monto_retenciones ?? 0) > 0)
+                                    <div class="font-bold text-gray-800">${{ number_format($it->total_neto, 2) }}</div>
+                                    <div class="text-[10px] text-gray-400">neto</div>
+                                @else
+                                    <span class="font-bold text-gray-800">${{ number_format($it->total_item ?: $it->subtotal, 2) }}</span>
+                                @endif
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="8" class="px-4 py-8 text-center text-gray-400 text-sm">Sin partidas.</td></tr>
+                        <tr><td colspan="{{ $hayRetenciones ? 9 : 8 }}" class="px-4 py-8 text-center text-gray-400 text-sm">Sin partidas.</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -125,12 +153,26 @@
                     <span class="font-bold text-gray-800">Total</span>
                     <span class="text-lg font-bold" style="color: #4A1660">${{ number_format($requisicion->total, 2) }}</span>
                 </div>
+                @if($hayRetenciones)
+                @php
+                    $totalRet  = $requisicion->items->sum(fn($it) => (float)($it->monto_retenciones ?? 0));
+                    $totalNeto = $requisicion->items->sum(fn($it) => (float)($it->total_neto ?? $it->total_item ?? 0));
+                @endphp
+                <div class="flex justify-between text-sm text-rose-600 pt-1 border-t border-rose-100">
+                    <span>Retenciones</span>
+                    <span class="font-semibold">- ${{ number_format($totalRet, 2) }}</span>
+                </div>
+                <div class="flex justify-between font-bold text-gray-900 text-base">
+                    <span>Total neto a pagar</span>
+                    <span style="color: #4A1660">${{ number_format($totalNeto, 2) }}</span>
+                </div>
+                @endif
             </div>
         </div>
     </div>
 
     {{-- ══ FORMULARIO DE RECEPCIÓN ══════════════════════════════════════ --}}
-    <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-xl">
+    <div x-data="{ enviando: false }" class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-xl">
         <div class="flex items-center gap-2 px-5 py-3 border-b border-gray-100"
              style="background: linear-gradient(90deg, #4A1660 0%, #6d28d9 100%);">
             <svg class="w-4 h-4 text-white/70" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -181,7 +223,6 @@
                     Firma de conformidad <span class="text-red-500">*</span>
                 </label>
 
-                {{-- Selector de modo --}}
                 <div class="flex items-center gap-4 mb-3 text-sm">
                     <label class="inline-flex items-center gap-2 cursor-pointer">
                         <input type="radio" name="modoFirmaRecibir" value="dibujar" checked
@@ -195,13 +236,11 @@
                     </label>
                 </div>
 
-                {{-- Canvas dibujar --}}
                 <div id="sigDrawWrap" class="rounded-xl border-2 border-gray-200 bg-white overflow-hidden"
                      style="touch-action: none;">
                     <canvas id="canvasFirmaRecibir" style="display:block; width:100%; height:160px;"></canvas>
                 </div>
 
-                {{-- Canvas escribir --}}
                 <div id="sigTypeWrap" class="hidden space-y-3">
                     <div class="flex gap-2">
                         <input id="firmaTextoRecibir" type="text"
@@ -233,15 +272,29 @@
                 </button>
             </div>
 
-            {{-- ── Botón guardar ──────────────────────────────────────── --}}
+            {{-- ── Botón guardar con estado enviando ─────────────────── --}}
             <div class="pt-2">
                 <button type="button" id="btnGuardarRecepcion"
-                        class="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-bold text-white rounded-xl shadow-md hover:shadow-lg transition-all"
+                        :disabled="enviando"
+                        :class="enviando ? 'opacity-60 cursor-not-allowed' : 'hover:shadow-lg'"
+                        class="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-bold text-white rounded-xl shadow-md transition-all"
                         style="background: linear-gradient(135deg, #059669, #047857);">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-                    </svg>
-                    Guardar recepción
+                    <template x-if="!enviando">
+                        <span class="flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            Guardar recepción
+                        </span>
+                    </template>
+                    <template x-if="enviando">
+                        <span class="flex items-center gap-2">
+                            <svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                            </svg>
+                            Guardando…
+                        </span>
+                    </template>
                 </button>
             </div>
 
@@ -277,10 +330,9 @@
         let drawing = false;
         let hasInk  = false;
 
-        // ── Inicializar canvas con tamaño real ──────────────────────────
         function initCanvas(c) {
             if (!c) return;
-            const w = c.offsetWidth  || c.parentElement.offsetWidth || 600;
+            const w = c.offsetWidth || c.parentElement.offsetWidth || 600;
             const h = 160;
             c.width  = w * dpr;
             c.height = h * dpr;
@@ -292,7 +344,6 @@
             ctx.fillRect(0, 0, w, h);
         }
 
-        // Esperar a que el DOM esté renderizado antes de inicializar
         requestAnimationFrame(() => {
             initCanvas(canvasDraw);
             if (canvasType) initCanvas(canvasType);
@@ -309,50 +360,30 @@
             function getPos(e) {
                 const rect = canvasDraw.getBoundingClientRect();
                 const src  = e.touches ? e.touches[0] : e;
-                return {
-                    x: (src.clientX - rect.left),
-                    y: (src.clientY - rect.top),
-                };
+                return { x: src.clientX - rect.left, y: src.clientY - rect.top };
             }
 
             canvasDraw.addEventListener('mousedown', e => {
                 if (getModo() !== 'dibujar') return;
-                e.preventDefault();
-                drawing = true;
-                hasInk  = true;
-                const p = getPos(e);
-                ctx.beginPath();
-                ctx.moveTo(p.x, p.y);
+                e.preventDefault(); drawing = true; hasInk = true;
+                const p = getPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y);
             });
-
             canvasDraw.addEventListener('mousemove', e => {
                 if (!drawing || getModo() !== 'dibujar') return;
                 e.preventDefault();
-                const p = getPos(e);
-                ctx.lineTo(p.x, p.y);
-                ctx.stroke();
+                const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke();
             });
-
             window.addEventListener('mouseup', () => { drawing = false; });
-
             canvasDraw.addEventListener('touchstart', e => {
                 if (getModo() !== 'dibujar') return;
-                e.preventDefault();
-                drawing = true;
-                hasInk  = true;
-                const p = getPos(e);
-                ctx.beginPath();
-                ctx.moveTo(p.x, p.y);
+                e.preventDefault(); drawing = true; hasInk = true;
+                const p = getPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y);
             }, { passive: false });
-
             canvasDraw.addEventListener('touchmove', e => {
                 if (!drawing || getModo() !== 'dibujar') return;
                 e.preventDefault();
-                const p = getPos(e);
-                ctx.lineTo(p.x, p.y);
-                ctx.stroke();
+                const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke();
             }, { passive: false });
-
             window.addEventListener('touchend', () => { drawing = false; }, { passive: false });
         }
 
@@ -360,18 +391,16 @@
             return document.querySelector('input[name="modoFirmaRecibir"]:checked')?.value || 'dibujar';
         }
 
-        // ── Cambio de modo ──────────────────────────────────────────────
         radios.forEach(r => r.addEventListener('change', () => {
             const esDibujar = getModo() === 'dibujar';
             drawWrap?.classList.toggle('hidden', !esDibujar);
             typeWrap?.classList.toggle('hidden', esDibujar);
         }));
 
-        // ── Limpiar ──────────────────────────────────────────────────────
         function clearAll() {
             const ctx = canvasDraw.getContext('2d');
-            const w   = canvasDraw.width  / dpr;
-            const h   = canvasDraw.height / dpr;
+            const w = canvasDraw.width / dpr;
+            const h = canvasDraw.height / dpr;
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(0, 0, w, h);
             hasInk = false;
@@ -380,28 +409,25 @@
                 canvasDraw.closest('[wire\\:id]')?.getAttribute('wire:id')
             )?.set('firma_base64', null);
         }
-
         clearBtn?.addEventListener('click', clearAll);
 
-        // ── Generar firma de texto ────────────────────────────────────────
         function renderTexto() {
             if (!canvasType) return;
             const nombre = (inputTexto?.value || '').trim();
-            const c    = canvasType.getContext('2d');
-            const w    = canvasType.width  / dpr;
-            const h    = canvasType.height / dpr;
+            const c = canvasType.getContext('2d');
+            const w = canvasType.width / dpr;
+            const h = canvasType.height / dpr;
             c.fillStyle = '#ffffff';
             c.fillRect(0, 0, w, h);
             if (!nombre) return;
-
             let fontSize = 56;
             c.font = `${fontSize}px "Great Vibes", cursive`;
             while (c.measureText(nombre).width > w - 40 && fontSize > 24) {
                 fontSize -= 2;
                 c.font = `${fontSize}px "Great Vibes", cursive`;
             }
-            c.fillStyle    = '#111827';
-            c.textAlign    = 'center';
+            c.fillStyle = '#111827';
+            c.textAlign = 'center';
             c.textBaseline = 'middle';
             c.fillText(nombre, w / 2, h / 2);
             hasInk = true;
@@ -415,12 +441,19 @@
             renderTexto();
         });
 
-        // ── Guardar recepción ─────────────────────────────────────────────
         btnGuardar.addEventListener('click', async () => {
             if (!hasInk) {
                 alert('Por favor firma antes de guardar la recepción.');
                 return;
             }
+
+            // Bloquear botón via Alpine
+            const alpineEl = btnGuardar.closest('[x-data]');
+            if (alpineEl) {
+                const alpineData = Alpine.$data(alpineEl);
+                if (alpineData) alpineData.enviando = true;
+            }
+            btnGuardar.disabled = true;
 
             let dataUrl;
             if (getModo() === 'dibujar') {
@@ -432,9 +465,8 @@
 
             hidden.value = dataUrl;
 
-            // Livewire 3: usar $wire desde el elemento
-            const wireEl  = document.querySelector('[wire\\:id]');
-            const wireId  = wireEl?.getAttribute('wire:id');
+            const wireEl    = document.querySelector('[wire\\:id]');
+            const wireId    = wireEl?.getAttribute('wire:id');
             const component = Livewire.find(wireId);
 
             if (!component) {
@@ -447,18 +479,13 @@
         });
     }
 
-    // Inicializar en carga normal y en navegación de Livewire
     document.addEventListener('DOMContentLoaded', initFirmaRecibir);
     document.addEventListener('livewire:navigated', () => {
-        // Resetear flag para permitir re-inicialización
         const c = document.getElementById('canvasFirmaRecibir');
         if (c) delete c.dataset.inited;
         initFirmaRecibir();
     });
-    // También inicializar si Livewire ya está listo
-    if (document.readyState !== 'loading') {
-        setTimeout(initFirmaRecibir, 100);
-    }
+    if (document.readyState !== 'loading') setTimeout(initFirmaRecibir, 100);
 })();
 </script>
 @endpush
