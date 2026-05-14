@@ -214,11 +214,12 @@ class Requisicion extends Model
             });
         }
 
-        // Jefe: sus requisiciones + las de sus subordinados
+        // Jefe: sus requisiciones + las de sus subordinados + las que tiene pendiente aprobar
         if ($user->hasRole('jefe')) {
             return $query->where(function ($q) use ($user) {
                 $q->where('solicitante_id', $user->id)
-                  ->orWhereHas('solicitante', fn($u) => $u->where('supervisor_id', $user->id));
+                ->orWhereHas('solicitante', fn($u) => $u->where('supervisor_id', $user->id))
+                ->orWhereHas('aprobaciones', fn($a) => $a->where('aprobador_id', $user->id));
             });
         }
 
