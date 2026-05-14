@@ -86,6 +86,39 @@
             @endif
         </div>
     </div>
+    {{-- ══ FACTURA ADJUNTA (solo si es pago de factura) ══════════════════ --}}
+        @if($requisicion->es_pago_factura)
+        <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-xl">
+            <div class="flex items-center gap-2 px-5 py-3 border-b border-gray-100 bg-violet-50">
+                <span>📄</span>
+                <h3 class="text-xs font-bold text-violet-700 uppercase tracking-widest">Factura adjunta por el solicitante</h3>
+            </div>
+            <div class="p-5">
+                @if($requisicion->factura_path)
+                    <a href="{{ Storage::disk('public')->url($requisicion->factura_path) }}" target="_blank"
+                    class="inline-flex items-center gap-3 px-4 py-3 bg-violet-50 border border-violet-200 rounded-xl hover:bg-violet-100 transition group">
+                        <span class="text-2xl">📄</span>
+                        <div>
+                            <p class="text-sm font-semibold text-violet-700 group-hover:underline">
+                                {{ $requisicion->factura_nombre ?? 'Ver factura' }}
+                            </p>
+                            <p class="text-xs text-violet-400">Clic para abrir el archivo</p>
+                        </div>
+                        <svg class="w-4 h-4 text-violet-400 ml-2" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                        </svg>
+                    </a>
+                @else
+                    <div class="flex items-center gap-2 text-sm text-red-500">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        Factura no adjunta — el solicitante no subió el archivo.
+                    </div>
+                @endif
+            </div>
+        </div>
+        @endif
 
     {{-- ══ PARTIDAS EDITABLES ═══════════════════════════════════════════ --}}
     <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-xl">
