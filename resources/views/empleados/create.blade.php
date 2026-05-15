@@ -1,97 +1,54 @@
 <x-app-layout>
-  <x-slot name="header">
-    <h2 class="text-xl font-semibold leading-tight text-gray-800">Agregar Empleado</h2>
-  </x-slot>
-
-  <div class="py-12">
-    <div class="max-w-3xl mx-auto sm:px-6 lg:px-8">
-      <div class="p-6 bg-white shadow sm:rounded-lg">
-        <form method="POST" action="{{ route('empleados.store') }}" class="space-y-6">
-          @csrf
-
-          {{-- Nombre --}}
-          <div>
-            <label class="block mb-1 text-sm font-medium text-gray-700">Nombre completo</label>
-            <input name="name" value="{{ old('name') }}" required
-                   class="w-full border-gray-300 rounded-md focus:border-indigo-500 focus:ring-indigo-500"/>
-            @error('name') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
-          </div>
-
-          {{-- Email --}}
-          <div>
-            <label class="block mb-1 text-sm font-medium text-gray-700">Correo electrónico</label>
-            <input type="email" name="email" value="{{ old('email') }}" required
-                   class="w-full border-gray-300 rounded-md focus:border-indigo-500 focus:ring-indigo-500"/>
-            @error('email') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
-          </div>
-
-          {{-- Departamento --}}
-          <div>
-            <label class="block mb-1 text-sm font-medium text-gray-700">Departamento</label>
-            <select name="departamento_id"
-                    class="w-full border-gray-300 rounded-md focus:border-indigo-500 focus:ring-indigo-500">
-              <option value="">— Selecciona —</option>
-              @foreach($departamentos as $d)
-                <option value="{{ $d->id }}" {{ old('departamento_id')==$d->id?'selected':'' }}>
-                  {{ $d->nombre }}
-                </option>
-              @endforeach
-            </select>
-            @error('departamento_id') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
-          </div>
-          <div class="mt-4">
-            <label class="block text-sm font-medium">Supervisor (Jefe)</label>
-            <select name="supervisor_id" class="w-full border-gray-300 rounded">
-                <option value="">— Sin supervisor —</option>
-                @foreach ($jefes as $j)
-                    <option value="{{ $j->id }}" @selected(old('supervisor_id') == $j->id)>{{ $j->name }}</option>
-                @endforeach
-            </select>
-            @error('supervisor_id') <p class="text-sm text-red-600">{{ $message }}</p> @enderror
-          </div>
-
-
-          {{-- Contraseña --}}
-          <div>
-            <label class="block mb-1 text-sm font-medium text-gray-700">Contraseña</label>
-            <input type="password" name="password" required
-                   class="w-full border-gray-300 rounded-md focus:border-indigo-500 focus:ring-indigo-500"/>
-            @error('password') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
-          </div>
-
-          <div>
-            <label class="block mb-1 text-sm font-medium text-gray-700">Confirmar contraseña</label>
-            <input type="password" name="password_confirmation" required
-                   class="w-full border-gray-300 rounded-md focus:border-indigo-500 focus:ring-indigo-500"/>
-          </div>
-
-          {{-- Roles --}}
-          <div>
-            <label class="block mb-2 text-sm font-medium text-gray-700">Roles</label>
-            <div class="flex flex-wrap gap-4">
-              @foreach($roles as $roleName)
-                <label class="inline-flex items-center gap-2">
-                  <input type="checkbox" name="roles[]"
-                         value="{{ $roleName }}"
-                         {{ in_array($roleName, old('roles', [])) ? 'checked' : '' }}
-                         class="text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
-                  <span class="text-sm text-gray-700 capitalize">{{ $roleName }}</span>
-                </label>
-              @endforeach
+    <x-slot name="header">
+        <div class="flex items-center gap-3">
+            <a href="{{ route('empleados.index') }}"
+               class="flex items-center justify-center w-8 h-8 text-gray-500 transition bg-gray-100 rounded-lg hover:bg-gray-200">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+                </svg>
+            </a>
+            <div>
+                <h2 class="text-lg font-bold text-gray-900">Agregar usuario</h2>
+                <p class="text-xs text-gray-400 mt-0.5">Crea un nuevo usuario en el sistema</p>
             </div>
-            @error('roles') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
-            @error('roles.*') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
-          </div>
+        </div>
+    </x-slot>
 
-          {{-- Botones --}}
-          <div class="flex items-center justify-between">
-            <a href="{{ route('empleados.index') }}" class="text-sm text-gray-600 hover:underline">Volver</a>
-            <button class="px-4 py-2 text-sm font-semibold text-white bg-gray-900 rounded-md">
-              Guardar
-            </button>
-          </div>
-        </form>
-      </div>
+    <div class="min-h-screen py-6" style="background: linear-gradient(160deg, #f8f5ff 0%, #f1f5f9 50%, #f8f5ff 100%);">
+        <div class="max-w-2xl px-4 mx-auto sm:px-6 lg:px-8">
+
+            <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-xl">
+                <div class="flex items-center gap-2 px-5 py-3 border-b border-gray-100"
+                     style="background: linear-gradient(90deg, #4A1660 0%, #6d28d9 100%);">
+                    <svg class="w-4 h-4 text-white/70" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+                    </svg>
+                    <h3 class="text-xs font-bold tracking-widest text-white uppercase">Datos del usuario</h3>
+                </div>
+                <div class="p-6">
+                    <form method="POST" action="{{ route('empleados.store') }}" class="space-y-5">
+                        @csrf
+
+                        @include('empleados._form')
+
+                        <div class="flex items-center justify-between pt-4 border-t border-gray-100">
+                            <a href="{{ route('empleados.index') }}"
+                               class="text-sm text-gray-500 transition hover:text-gray-700">
+                                Cancelar
+                            </a>
+                            <button type="submit"
+                                    class="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-bold text-white rounded-xl shadow-md hover:shadow-lg transition-all"
+                                    style="background: linear-gradient(135deg, #4A1660, #7c3aed);">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                                </svg>
+                                Crear usuario
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+        </div>
     </div>
-  </div>
 </x-app-layout>

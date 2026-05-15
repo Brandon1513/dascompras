@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\Departamento;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Role;
@@ -34,8 +35,6 @@ class EmpleadoController extends Controller
     {
         $departamentos = Departamento::where('activo', true)->orderBy('nombre')->get();
         $roles = Role::orderBy('name')->pluck('name');
-
-        // Sólo usuarios con rol "jefe"
         $jefes = User::role('jefe')->orderBy('name')->get(['id','name']);
 
         return view('empleados.create', compact('departamentos','roles','jefes'));
@@ -50,19 +49,17 @@ class EmpleadoController extends Controller
             'email'           => ['required','email','max:255','unique:users,email'],
             'departamento_id' => ['nullable','exists:departamentos,id'],
             'password'        => ['required','confirmed','min:8'],
-            'supervisor_id' => [
+            'supervisor_id'   => [
                 'nullable','integer','exists:users,id',
                 function ($attr,$value,$fail) {
                     if (!$value) return;
                     $boss = \App\Models\User::find($value);
-                    // <- case-insensitive
                     $tieneRolJefe = $boss?->roles()->whereRaw('LOWER(name) = ?', ['jefe'])->exists();
                     if (!$tieneRolJefe) {
                         $fail('El supervisor seleccionado debe tener el rol de Jefe.');
                     }
                 },
             ],
-
             'roles'           => ['array'],
             'roles.*'         => ['string', Rule::in($validRoles)],
         ]);
@@ -73,7 +70,7 @@ class EmpleadoController extends Controller
             'password'        => Hash::make($data['password']),
             'activo'          => true,
             'departamento_id' => $data['departamento_id'] ?? null,
-            'supervisor_id'   => $data['supervisor_id'] ?? null,   // 👈 guardar jefe
+            'supervisor_id'   => $data['supervisor_id'] ?? null,
         ]);
 
         $user->syncRoles($data['roles'] ?? []);
@@ -87,7 +84,6 @@ class EmpleadoController extends Controller
         $roles = Role::orderBy('name')->pluck('name');
         $userRoles = $user->roles->pluck('name')->toArray();
 
-        // Jefes, excluyendo al mismo usuario
         $jefes = User::role('jefe')
             ->where('id','!=',$user->id)
             ->orderBy('name')->get(['id','name']);
@@ -97,32 +93,38 @@ class EmpleadoController extends Controller
 
     public function update(Request $request, User $user)
     {
+        // Proteger al administrador logueado: no puede quitarse el rol administrador
+        if (Auth::id() === $user->id) {
+            $roles = $request->input('roles', []);
+            $tieneAdminEnRequest = collect($roles)->map(fn($r) => strtolower($r))->contains('administrador');
+            if (!$tieneAdminEnRequest) {
+                return back()->withInput()->with('error', 'No puedes quitarte el rol de administrador a ti mismo.');
+            }
+        }
+
         $data = $request->validate([
             'name'            => ['required','string','max:255'],
             'email'           => ['required','email','max:255', Rule::unique('users','email')->ignore($user->id)],
             'departamento_id' => ['nullable','exists:departamentos,id'],
             'password'        => ['nullable','confirmed','min:8'],
-            'supervisor_id' => [
-                    'nullable','integer','exists:users,id','different:'.$user->id,
-                    function ($attr,$value,$fail) use ($user) {
-                        if (!$value) return;
-                        $boss = \App\Models\User::find($value);
-
-                        $tieneRolJefe = $boss?->roles()->whereRaw('LOWER(name) = ?', ['jefe'])->exists();
-                        if (!$tieneRolJefe) {
-                            return $fail('El supervisor seleccionado debe tener el rol de Jefe.');
+            'supervisor_id'   => [
+                'nullable','integer','exists:users,id','different:'.$user->id,
+                function ($attr,$value,$fail) use ($user) {
+                    if (!$value) return;
+                    $boss = \App\Models\User::find($value);
+                    $tieneRolJefe = $boss?->roles()->whereRaw('LOWER(name) = ?', ['jefe'])->exists();
+                    if (!$tieneRolJefe) {
+                        return $fail('El supervisor seleccionado debe tener el rol de Jefe.');
+                    }
+                    $curr = $boss; $depth = 0;
+                    while ($curr && $depth++ < 10) {
+                        if ($curr->id === $user->id) {
+                            return $fail('No se puede asignar un subordinado como supervisor (ciclo detectado).');
                         }
-
-                        // Evitar ciclos
-                        $curr = $boss; $depth = 0;
-                        while ($curr && $depth++ < 10) {
-                            if ($curr->id === $user->id) {
-                                return $fail('No se puede asignar un subordinado como supervisor (ciclo detectado).');
-                            }
-                            $curr = $curr->supervisor;
-                        }
-                    },
-                ],
+                        $curr = $curr->supervisor;
+                    }
+                },
+            ],
             'roles'           => ['array'],
             'roles.*'         => ['string'],
         ]);
@@ -130,8 +132,8 @@ class EmpleadoController extends Controller
         $user->name            = $data['name'];
         $user->email           = $data['email'];
         $user->departamento_id = $data['departamento_id'] ?? null;
-        $user->supervisor_id   = $data['supervisor_id'] ?? null;   // 👈 actualizar jefe
-        if(!empty($data['password'])){
+        $user->supervisor_id   = $data['supervisor_id'] ?? null;
+        if (!empty($data['password'])) {
             $user->password = Hash::make($data['password']);
         }
         $user->save();
@@ -143,6 +145,12 @@ class EmpleadoController extends Controller
 
     public function toggle(User $user)
     {
+        // Proteger al administrador logueado: no puede inactivarse a sí mismo
+        if (Auth::id() === $user->id) {
+            return redirect()->route('empleados.index')
+                ->with('error', 'No puedes inactivar tu propia cuenta.');
+        }
+
         $user->activo = ! $user->activo;
         $user->save();
 

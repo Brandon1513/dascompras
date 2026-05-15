@@ -184,6 +184,16 @@
                         </div>
                     </div>
 
+                    {{-- Ayuda --}}
+                    <a href="{{ route('ayuda') }}"
+                       class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150
+                              {{ request()->routeIs('ayuda') ? 'bg-white/20 text-white' : 'text-white/70 hover:text-white hover:bg-white/10' }}">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                        </svg>
+                        Ayuda
+                    </a>
+
                 </div>
                 @endauth
             </div>
@@ -349,6 +359,16 @@
                 Tipos de Retención
             </a>
             @endif
+
+            {{-- Ayuda móvil --}}
+            <a href="{{ route('ayuda') }}"
+               class="flex items-center w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-100
+                      {{ request()->routeIs('ayuda') ? 'bg-white/15 text-white font-semibold' : 'text-white/70 hover:text-white hover:bg-white/10' }}">
+                <svg class="w-4 h-4 mr-2 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                </svg>
+                Ayuda
+            </a>
 
             <div class="pt-3 mt-1" style="border-top: 1px solid rgba(255,255,255,0.1);">
                 <div class="px-3 py-2 mb-1">

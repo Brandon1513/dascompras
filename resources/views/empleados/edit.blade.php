@@ -1,102 +1,71 @@
 <x-app-layout>
-  <x-slot name="header">
-    <h2 class="text-xl font-semibold leading-tight text-gray-800">Editar Empleado</h2>
-  </x-slot>
-
-  <div class="py-12">
-    <div class="max-w-3xl mx-auto sm:px-6 lg:px-8">
-      <div class="p-6 bg-white shadow sm:rounded-lg">
-        <form method="POST" action="{{ route('empleados.update', $user->id) }}" class="space-y-6">
-          @csrf @method('PUT')
-
-          {{-- Nombre --}}
-          <div>
-            <label class="block mb-1 text-sm font-medium text-gray-700">Nombre completo</label>
-            <input name="name" value="{{ old('name',$user->name) }}" required
-                   class="w-full border-gray-300 rounded-md focus:border-indigo-500 focus:ring-indigo-500"/>
-            @error('name') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
-          </div>
-
-          {{-- Email --}}
-          <div>
-            <label class="block mb-1 text-sm font-medium text-gray-700">Correo electrónico</label>
-            <input type="email" name="email" value="{{ old('email',$user->email) }}" required
-                   class="w-full border-gray-300 rounded-md focus:border-indigo-500 focus:ring-indigo-500"/>
-            @error('email') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
-          </div>
-
-          {{-- Departamento --}}
-          <div>
-            <label class="block mb-1 text-sm font-medium text-gray-700">Departamento</label>
-            <select name="departamento_id"
-                    class="w-full border-gray-300 rounded-md focus:border-indigo-500 focus:ring-indigo-500">
-              <option value="">— Selecciona —</option>
-              @foreach($departamentos as $d)
-                <option value="{{ $d->id }}" {{ old('departamento_id',$user->departamento_id)==$d->id?'selected':'' }}>
-                  {{ $d->nombre }}
-                </option>
-              @endforeach
-            </select>
-            @error('departamento_id') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
-          </div>
-          <div class="mt-4">
-            <label class="block text-sm font-medium">Supervisor (Jefe)</label>
-            <select name="supervisor_id" class="w-full border-gray-300 rounded">
-                <option value="">— Sin supervisor —</option>
-                @foreach ($jefes as $j)
-                    <option value="{{ $j->id }}" @selected(old('supervisor_id', $user->supervisor_id) == $j->id)>
-                        {{ $j->name }}
-                    </option>
-                @endforeach
-            </select>
-            @error('supervisor_id') <p class="text-sm text-red-600">{{ $message }}</p> @enderror
-          </div>
-
-
-          {{-- Roles (checks) --}}
-          <div>
-            <label class="block mb-2 text-sm font-medium text-gray-700">Roles</label>
-            <div class="flex flex-wrap gap-4">
-              @foreach($roles as $roleName)
-                <label class="inline-flex items-center gap-2">
-                  <input type="checkbox" name="roles[]"
-                         value="{{ $roleName }}"
-                         {{ in_array($roleName, old('roles',$userRoles)) ? 'checked' : '' }}
-                         class="text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
-                  <span class="text-sm text-gray-700 capitalize">{{ $roleName }}</span>
-                </label>
-              @endforeach
+    <x-slot name="header">
+        <div class="flex items-center gap-3">
+            <a href="{{ route('empleados.index') }}"
+               class="flex items-center justify-center w-8 h-8 text-gray-500 transition bg-gray-100 rounded-lg hover:bg-gray-200">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+                </svg>
+            </a>
+            <div>
+                <h2 class="text-lg font-bold text-gray-900">Editar usuario</h2>
+                <p class="text-xs text-gray-400 mt-0.5">{{ $user->name }}</p>
             </div>
-          </div>
+        </div>
+    </x-slot>
 
-          {{-- Password opcional --}}
-          <div>
-            <label class="block mb-1 text-sm font-medium text-gray-700">Contraseña (opcional)</label>
-            <input type="password" name="password"
-                   class="w-full border-gray-300 rounded-md focus:border-indigo-500 focus:ring-indigo-500"/>
-            <p class="mt-1 text-xs text-gray-500">Si no deseas cambiar la contraseña, deja este campo vacío.</p>
-            @error('password') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
-          </div>
+    <div class="min-h-screen py-6" style="background: linear-gradient(160deg, #f8f5ff 0%, #f1f5f9 50%, #f8f5ff 100%);">
+        <div class="max-w-2xl px-4 mx-auto space-y-4 sm:px-6 lg:px-8">
 
-          <div>
-            <label class="block mb-1 text-sm font-medium text-gray-700">Confirmar Contraseña</label>
-            <input type="password" name="password_confirmation"
-                   class="w-full border-gray-300 rounded-md focus:border-indigo-500 focus:ring-indigo-500"/>
-          </div>
+            <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-xl">
+                <div class="flex items-center gap-2 px-5 py-3 border-b border-gray-100"
+                     style="background: linear-gradient(90deg, #4A1660 0%, #6d28d9 100%);">
+                    <svg class="w-4 h-4 text-white/70" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                    </svg>
+                    <h3 class="text-xs font-bold tracking-widest text-white uppercase">Datos del usuario</h3>
+                </div>
+                <div class="p-6">
+                    @if (session('error'))
+                        <div class="flex items-center gap-2 p-3 mb-5 text-sm font-medium text-red-800 border border-red-200 rounded-xl bg-red-50">
+                            <svg class="w-4 h-4 text-red-500 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            {{ session('error') }}
+                        </div>
+                    @endif
+                    <form method="POST" action="{{ route('empleados.update', $user->id) }}" class="space-y-5">
+                        @csrf @method('PUT')
 
-          {{-- Botones --}}
-          <div class="flex items-center justify-between">
-            <a href="{{ route('empleados.index') }}" class="text-sm text-gray-600 hover:underline">Volver</a>
-            <div class="flex items-center gap-3">
-              <a href="{{ route('empleados.resend', $user->id) }}"
-                 class="text-sm text-indigo-700 hover:underline">Reenviar correo de bienvenida</a>
-              <button class="px-4 py-2 text-sm font-semibold text-white bg-gray-900 rounded-md">
-                Guardar cambios
-              </button>
+                        @include('empleados._form')
+
+                        <div class="flex items-center justify-between pt-4 border-t border-gray-100">
+                            <a href="{{ route('empleados.resend', $user->id) }}"
+                               class="inline-flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-800 transition">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                </svg>
+                                Reenviar correo de bienvenida
+                            </a>
+                            <div class="flex items-center gap-3">
+                                <a href="{{ route('empleados.index') }}"
+                                   class="text-sm text-gray-500 transition hover:text-gray-700">
+                                    Cancelar
+                                </a>
+                                <button type="submit"
+                                        class="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-bold text-white rounded-xl shadow-md hover:shadow-lg transition-all"
+                                        style="background: linear-gradient(135deg, #4A1660, #7c3aed);">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                                    </svg>
+                                    Guardar cambios
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
             </div>
-          </div>
-        </form>
-      </div>
+
+        </div>
     </div>
-  </div>
 </x-app-layout>

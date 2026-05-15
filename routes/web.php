@@ -160,6 +160,8 @@ Route::middleware(['auth', 'role:administrador|compras'])->prefix('catalogos')->
  
 });
 
+Route::get('/ayuda', fn() => view('ayuda'))->name('ayuda');
+
 
  
 
