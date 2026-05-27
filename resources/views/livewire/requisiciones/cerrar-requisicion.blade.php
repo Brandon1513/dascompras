@@ -32,7 +32,7 @@
                 <h2 class="text-base font-semibold text-gray-800">{{ $requisicion->folio }}</h2>
                 <p class="text-xs text-gray-500 mt-0.5">
                     Solicitante: <strong>{{ $requisicion->solicitante?->name }}</strong>
-                    · {{ optional($requisicion->fecha_emision)->format('d/m/Y') }}
+                    · {{ optional($requisicion->fecha_emision)->format('d/m/Y') }} a las {{ $requisicion->created_at->format('h:i A') }}
                 </p>
             </div>
             <div class="flex items-center gap-2">
@@ -68,7 +68,7 @@
 
         {{-- Retenciones y total neto (solo si aplica) --}}
         @if($hayRetenciones)
-        <div class="grid grid-cols-2 gap-4 text-sm md:grid-cols-4 mt-3 pt-3 border-t border-rose-100">
+        <div class="grid grid-cols-2 gap-4 pt-3 mt-3 text-sm border-t md:grid-cols-4 border-rose-100">
             <div class="md:col-start-3">
                 <dt class="text-xs text-rose-500 mb-0.5">Retenciones</dt>
                 <dd class="font-semibold text-rose-600">- ${{ number_format($totalRet, 2) }}</dd>

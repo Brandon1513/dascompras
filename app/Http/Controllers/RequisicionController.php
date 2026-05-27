@@ -9,6 +9,8 @@ use Illuminate\Http\Request;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 
 class RequisicionController extends Controller
 {
@@ -212,5 +214,97 @@ class RequisicionController extends Controller
             ->setPaper('a4', 'portrait')
             ->stream("REQ-{$requisicion->folio}.pdf");
     }
+
+    public function duplicar(Requisicion $requisicion)
+    {
+        abort_unless(
+            in_array($requisicion->estado, ['rechazada', 'recibida', 'rechazada_compras']),
+            403,
+            'Solo se pueden duplicar requisiciones rechazadas o recibidas.'
+        );
+ 
+        $requisicion->load(['items.tiposRetencion']);
+ 
+        $nueva = null;
+ 
+        DB::transaction(function () use ($requisicion, &$nueva) {
+            $nueva = Requisicion::create([
+                'folio'           => $this->generarFolioRequisicion(),
+                'solicitante_id'  => Auth::id(),
+                'departamento_id' => $requisicion->departamento_id,
+                'centro_costo_id' => $requisicion->centro_costo_id,
+                'justificacion'   => $requisicion->justificacion,
+                'es_pago_factura' => $requisicion->es_pago_factura,
+                'urgencia'        => $requisicion->urgencia,
+                'estado'          => 'borrador',
+                'fecha_emision'   => now(),
+                'subtotal'        => $requisicion->subtotal,
+                'iva'             => $requisicion->iva,
+                'total'           => $requisicion->total,
+                // NO se copia: metodo_pago, factura_path, uuid, archivos de cierre
+            ]);
+ 
+            foreach ($requisicion->items as $item) {
+                $nuevoItem = \App\Models\RequisicionItem::create([
+                    'requisicion_id'   => $nueva->id,
+                    'descripcion'      => $item->descripcion,
+                    'unidad_medida_id' => $item->unidad_medida_id,
+                    'unidad'           => $item->unidad,
+                    'cantidad'         => $item->cantidad,
+                    'precio_unitario'  => $item->precio_unitario,
+                    'subtotal'         => $item->subtotal,
+                    'tipo_impuesto_id' => $item->tipo_impuesto_id,
+                    'monto_impuesto'   => $item->monto_impuesto,
+                    'total_item'       => $item->total_item,
+                    'link_compra'      => $item->link_compra,
+                    'proveedor_sugerido' => $item->proveedor_sugerido,
+                    'monto_retenciones'  => $item->monto_retenciones,
+                    'total_neto'         => $item->total_neto,
+                    // NO se copia: metodo_pago (lo asigna Compras), ficha_tecnica_path/nombre
+                    // NO se copian archivos adjuntos (RequisicionItemArchivo)
+                ]);
+ 
+                // Copiar retenciones (son referencias a catálogo, no archivos)
+                foreach ($item->tiposRetencion as $retencion) {
+                    $montoOriginal = \App\Models\RequisicionItemRetencion::where([
+                        'requisicion_item_id' => $item->id,
+                        'tipo_retencion_id'   => $retencion->id,
+                    ])->value('monto') ?? 0;
+ 
+                    \App\Models\RequisicionItemRetencion::create([
+                        'requisicion_item_id' => $nuevoItem->id,
+                        'tipo_retencion_id'   => $retencion->id,
+                        'monto'               => $montoOriginal,
+                    ]);
+                }
+            }
+        });
+ 
+        return redirect()
+            ->route('requisiciones.edit', $nueva)
+            ->with('status', "Copia creada de {$requisicion->folio}. Revisa los datos y envía cuando esté lista.");
+    }
+
+    private function generarFolioRequisicion(): string
+{
+    $fecha = now();
+
+    // Ejemplo: REQ-2605
+    $prefijo = 'REQ-' . $fecha->format('ym');
+
+    $ultimo = Requisicion::where('folio', 'like', $prefijo . '-%')
+        ->lockForUpdate()
+        ->orderByDesc('id')
+        ->first();
+
+    if ($ultimo && preg_match('/-(\d+)$/', $ultimo->folio, $matches)) {
+        $consecutivo = (int) $matches[1] + 1;
+    } else {
+        $consecutivo = 1;
+    }
+
+    return $prefijo . '-' . str_pad($consecutivo, 4, '0', STR_PAD_LEFT);
+}
+
 
 }

@@ -170,7 +170,8 @@
                                     </td>
 
                                     <td class="px-4 py-3.5 text-xs text-gray-500">
-                                        {{ \Carbon\Carbon::parse($r->fecha_emision)->format('d/m/Y') }}
+                                        <div>{{ \Carbon\Carbon::parse($r->fecha_emision)->format('d/m/Y') }}</div>
+                                        <div class="text-[10px] text-gray-400">{{ $r->created_at->format('h:i A') }}</div>
                                     </td>
 
                                     <td class="px-4 py-3.5 text-sm font-medium text-gray-700">{{ $r->solicitante?->name ?? '—' }}</td>
@@ -178,11 +179,11 @@
                                     {{-- Artículos con ver más --}}
                                     <td class="px-4 py-3.5 max-w-[220px]">
                                         <div x-data="{ open: false }">
-                                            <p class="text-xs text-gray-700 font-medium leading-snug">{{ $primerItem }}</p>
+                                            <p class="text-xs font-medium leading-snug text-gray-700">{{ $primerItem }}</p>
                                             @if($totalItems > 1)
                                                 <div x-show="open" x-collapse class="mt-1 space-y-0.5">
                                                     @foreach($restoItems as $desc)
-                                                        <p class="text-xs text-gray-500 leading-snug">{{ $desc }}</p>
+                                                        <p class="text-xs leading-snug text-gray-500">{{ $desc }}</p>
                                                     @endforeach
                                                 </div>
                                                 <button type="button"
@@ -315,6 +316,15 @@
                                                     PDF
                                                 </a>
                                             @endif
+
+                                            @if(in_array($r->estado, ['rechazada', 'recibida', 'rechazada_compras']) && $r->solicitante_id === auth()->id())
+                                                <a href="{{ route('requisiciones.duplicar', $r) }}"
+                                                onclick="return confirm('¿Crear una copia de {{ $r->folio }}? Se abrirá como borrador para que la edites y envíes.')"
+                                                class="px-2.5 py-1 rounded-md font-semibold text-teal-700 bg-teal-50 hover:bg-teal-100 transition">
+                                                    📋 Copiar
+                                                </a>
+                                            @endif
+
                                         </div>
                                     </td>
                                 </tr>

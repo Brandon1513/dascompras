@@ -48,7 +48,8 @@
                         @endif
                     </div>
                     <p class="text-xs text-gray-400 mt-0.5">
-                        Emitida el {{ optional($requisicion->fecha_emision)->format('d/m/Y') }}
+                        Emitida el {{ optional($requisicion->fecha_emision)->format('d/m/Y') }} 
+                        a las {{ $requisicion->created_at->format('h:i A') }}
                         por <span class="font-semibold text-gray-600">{{ $requisicion->solicitante?->name }}</span>
                     </p>
                 </div>
@@ -91,12 +92,12 @@
         <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-xl">
             <div class="flex items-center gap-2 px-5 py-3 border-b border-gray-100 bg-violet-50">
                 <span>📄</span>
-                <h3 class="text-xs font-bold text-violet-700 uppercase tracking-widest">Factura adjunta por el solicitante</h3>
+                <h3 class="text-xs font-bold tracking-widest uppercase text-violet-700">Factura adjunta por el solicitante</h3>
             </div>
             <div class="p-5">
                 @if($requisicion->factura_path)
                     <a href="{{ Storage::disk('public')->url($requisicion->factura_path) }}" target="_blank"
-                    class="inline-flex items-center gap-3 px-4 py-3 bg-violet-50 border border-violet-200 rounded-xl hover:bg-violet-100 transition group">
+                    class="inline-flex items-center gap-3 px-4 py-3 transition border bg-violet-50 border-violet-200 rounded-xl hover:bg-violet-100 group">
                         <span class="text-2xl">📄</span>
                         <div>
                             <p class="text-sm font-semibold text-violet-700 group-hover:underline">
@@ -104,7 +105,7 @@
                             </p>
                             <p class="text-xs text-violet-400">Clic para abrir el archivo</p>
                         </div>
-                        <svg class="w-4 h-4 text-violet-400 ml-2" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <svg class="w-4 h-4 ml-2 text-violet-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
                         </svg>
                     </a>
@@ -329,7 +330,7 @@
                     $totalNeto = collect($items)->sum(fn($r) => (float)($r['total_neto'] ?? $r['total_item'] ?? 0));
                 @endphp
                 @if($totalRet > 0)
-                <div class="flex justify-between text-sm text-rose-600 pt-1 border-t border-rose-100">
+                <div class="flex justify-between pt-1 text-sm border-t text-rose-600 border-rose-100">
                     <span>Retenciones</span>
                     <span class="font-semibold">- ${{ number_format($totalRet, 2) }}</span>
                 </div>

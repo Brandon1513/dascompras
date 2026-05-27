@@ -91,6 +91,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/requisiciones/crear',
         [RequisicionController::class, 'create']
     )->name('requisiciones.create');
+
+    Route::get('/requisiciones/{requisicion}/duplicar', [RequisicionController::class, 'duplicar'])->name('requisiciones.duplicar');
  
     // Exportar Excel — DEBE ir antes de /{requisicion} para no colisionar
     Route::get('/requisiciones/exportar',

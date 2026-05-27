@@ -23,7 +23,7 @@
             <div class="flex items-center justify-between mb-4">
                 <div>
                     <h2 class="text-base font-bold text-gray-900">{{ $requisicion->folio }}</h2>
-                    <p class="text-xs text-gray-400 mt-0.5">{{ optional($requisicion->fecha_emision)->format('d/m/Y') }} · {{ $requisicion->solicitante?->name }}</p>
+                    <p class="text-xs text-gray-400 mt-0.5">{{ optional($requisicion->fecha_emision)->format('d/m/Y') }} a las {{ $requisicion->created_at->format('h:i A') }} · {{ $requisicion->solicitante?->name }}</p>
                 </div>
                 <div class="flex items-center gap-2">
                     @if($requisicion->es_pago_factura)
@@ -88,7 +88,7 @@
                 </thead>
                 <tbody class="divide-y divide-gray-50">
                     @forelse($requisicion->items as $it)
-                        <tr class="hover:bg-purple-50/20 transition-colors">
+                        <tr class="transition-colors hover:bg-purple-50/20">
                             <td class="px-4 py-3 text-xs text-gray-500">{{ (int) $it->cantidad }}</td>
                             <td class="px-4 py-3">
                                 <span class="font-medium text-gray-800">{{ $it->descripcion }}</span>
@@ -98,14 +98,14 @@
                             </td>
                             <td class="px-4 py-3 text-xs text-gray-500">{{ $it->unidad_label }}</td>
                             <td class="px-4 py-3 text-xs text-gray-600">{{ $it->proveedor_sugerido ?: '—' }}</td>
-                            <td class="px-4 py-3 text-right text-xs text-gray-600">${{ number_format($it->precio_unitario, 2) }}</td>
-                            <td class="px-4 py-3 text-right text-xs text-gray-600">${{ number_format($it->subtotal, 2) }}</td>
+                            <td class="px-4 py-3 text-xs text-right text-gray-600">${{ number_format($it->precio_unitario, 2) }}</td>
+                            <td class="px-4 py-3 text-xs text-right text-gray-600">${{ number_format($it->subtotal, 2) }}</td>
                             <td class="px-4 py-3 text-right">
                                 @if($it->tipoImpuesto)
                                     <div class="text-xs text-gray-600">${{ number_format($it->monto_impuesto, 2) }}</div>
                                     <div class="text-[10px] text-gray-400">{{ $it->tipoImpuesto->nombre }}</div>
                                 @else
-                                    <span class="text-gray-300 text-xs">—</span>
+                                    <span class="text-xs text-gray-300">—</span>
                                 @endif
                             </td>
                             @if($hayRetenciones)
@@ -120,11 +120,11 @@
                                         @endif
                                     @endforeach
                                 @else
-                                    <span class="text-gray-300 text-xs">—</span>
+                                    <span class="text-xs text-gray-300">—</span>
                                 @endif
                             </td>
                             @endif
-                            <td class="px-4 py-3 text-right text-sm">
+                            <td class="px-4 py-3 text-sm text-right">
                                 @if(($it->monto_retenciones ?? 0) > 0)
                                     <div class="font-bold text-gray-800">${{ number_format($it->total_neto, 2) }}</div>
                                     <div class="text-[10px] text-gray-400">neto</div>
@@ -134,7 +134,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="{{ $hayRetenciones ? 9 : 8 }}" class="px-4 py-8 text-center text-gray-400 text-sm">Sin partidas.</td></tr>
+                        <tr><td colspan="{{ $hayRetenciones ? 9 : 8 }}" class="px-4 py-8 text-sm text-center text-gray-400">Sin partidas.</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -158,11 +158,11 @@
                     $totalRet  = $requisicion->items->sum(fn($it) => (float)($it->monto_retenciones ?? 0));
                     $totalNeto = $requisicion->items->sum(fn($it) => (float)($it->total_neto ?? $it->total_item ?? 0));
                 @endphp
-                <div class="flex justify-between text-sm text-rose-600 pt-1 border-t border-rose-100">
+                <div class="flex justify-between pt-1 text-sm border-t text-rose-600 border-rose-100">
                     <span>Retenciones</span>
                     <span class="font-semibold">- ${{ number_format($totalRet, 2) }}</span>
                 </div>
-                <div class="flex justify-between font-bold text-gray-900 text-base">
+                <div class="flex justify-between text-base font-bold text-gray-900">
                     <span>Total neto a pagar</span>
                     <span style="color: #4A1660">${{ number_format($totalNeto, 2) }}</span>
                 </div>
@@ -183,7 +183,7 @@
         <div class="p-5 space-y-5">
 
             @if (session('status'))
-                <div class="flex items-center gap-2 p-3 text-sm font-medium text-emerald-800 border border-emerald-200 rounded-lg bg-emerald-50">
+                <div class="flex items-center gap-2 p-3 text-sm font-medium border rounded-lg text-emerald-800 border-emerald-200 bg-emerald-50">
                     ✅ {{ session('status') }}
                 </div>
             @endif
@@ -227,16 +227,16 @@
                     <label class="inline-flex items-center gap-2 cursor-pointer">
                         <input type="radio" name="modoFirmaRecibir" value="dibujar" checked
                                class="text-purple-600 focus:ring-purple-500">
-                        <span class="text-gray-700 font-medium">Dibujar</span>
+                        <span class="font-medium text-gray-700">Dibujar</span>
                     </label>
                     <label class="inline-flex items-center gap-2 cursor-pointer">
                         <input type="radio" name="modoFirmaRecibir" value="escribir"
                                class="text-purple-600 focus:ring-purple-500">
-                        <span class="text-gray-700 font-medium">Escribir nombre</span>
+                        <span class="font-medium text-gray-700">Escribir nombre</span>
                     </label>
                 </div>
 
-                <div id="sigDrawWrap" class="rounded-xl border-2 border-gray-200 bg-white overflow-hidden"
+                <div id="sigDrawWrap" class="overflow-hidden bg-white border-2 border-gray-200 rounded-xl"
                      style="touch-action: none;">
                     <canvas id="canvasFirmaRecibir" style="display:block; width:100%; height:160px;"></canvas>
                 </div>
@@ -247,12 +247,12 @@
                                placeholder="Escribe tu nombre completo…"
                                class="flex-1 text-sm border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
                         <button type="button" id="btnGenerarFirmaTexto"
-                                class="px-4 py-2 text-sm font-semibold text-white rounded-lg transition"
+                                class="px-4 py-2 text-sm font-semibold text-white transition rounded-lg"
                                 style="background: linear-gradient(135deg, #4A1660, #7c3aed);">
                             Generar
                         </button>
                     </div>
-                    <div class="rounded-xl border-2 border-gray-200 bg-white overflow-hidden">
+                    <div class="overflow-hidden bg-white border-2 border-gray-200 rounded-xl">
                         <canvas id="canvasFirmaTexto" style="display:block; width:100%; height:160px;"></canvas>
                     </div>
                 </div>
