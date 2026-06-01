@@ -269,7 +269,7 @@
                     <div class="col-span-4 sm:col-span-2">
                         <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Cantidad</label>
                         <input type="number" step="1" min="1"
-                               wire:model.live="items.{{ $i }}.cantidad"
+                               wire:model.blur="items.{{ $i }}.cantidad"
                                class="w-full text-sm text-right border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
                     </div>
 
@@ -289,7 +289,7 @@
                         <div class="relative">
                             <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-300 text-xs font-bold">$</span>
                             <input type="number" step="0.01" min="0"
-                                   wire:model.live="items.{{ $i }}.precio_unitario"
+                                   wire:model.blur="items.{{ $i }}.precio_unitario"
                                    class="w-full pl-6 text-sm text-right border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
                         </div>
                     </div>
