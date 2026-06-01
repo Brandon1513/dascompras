@@ -128,10 +128,8 @@
                 </div>
             </div>
 
-            {{-- Checkboxes: Afecta producción + Pago de factura --}}
+            {{-- Checkboxes --}}
             <div class="pt-1 space-y-3">
-
-                {{-- Checkbox: Afecta proceso de producción --}}
                 <label class="flex items-start gap-3 p-3 rounded-xl border border-orange-100 bg-orange-50/50 cursor-pointer hover:bg-orange-50 transition-colors">
                     <div class="flex items-center h-5 mt-0.5">
                         <input type="checkbox" wire:model.live="afecta_produccion"
@@ -143,7 +141,6 @@
                     </div>
                 </label>
 
-                {{-- Checkbox: Pago de factura --}}
                 <label class="flex items-start gap-3 p-3 rounded-xl border border-gray-100 bg-gray-50/50 cursor-pointer hover:bg-gray-50 transition-colors">
                     <div class="flex items-center h-5 mt-0.5">
                         <input type="checkbox" wire:model.live="es_pago_factura"
@@ -353,10 +350,10 @@
                         </div>
                     </div>
                 </div>
-                {{-- Retenciones — solo visible si es pago de factura --}}
+
+                {{-- Retenciones --}}
                 @if($es_pago_factura && count($tipos_retencion) > 0)
                 <div class="rounded-xl border border-rose-100 bg-rose-50/40 p-4 space-y-3">
-                
                     <div class="flex items-center gap-2">
                         <svg class="w-4 h-4 text-rose-500 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2zM10 8.5a.5.5 0 11-1 0 .5.5 0 011 0zm5 5a.5.5 0 11-1 0 .5.5 0 011 0z"/>
@@ -364,7 +361,7 @@
                         <span class="text-xs font-bold text-rose-700 uppercase tracking-wider">Retenciones</span>
                         <span class="text-xs text-rose-400 font-normal">Revisa el pdf que adjuntas para verificar las retenciones</span>
                     </div>
-                
+
                     <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
                         @foreach($tipos_retencion as $ret)
                         <label class="flex items-start gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-colors
@@ -386,8 +383,7 @@
                         </label>
                         @endforeach
                     </div>
-                
-                    {{-- Resumen de retenciones de esta partida --}}
+
                     @if(($row['monto_retenciones'] ?? 0) > 0)
                     <div class="flex items-center justify-between pt-2 border-t border-rose-100 text-sm">
                         <span class="text-xs text-rose-600 font-medium">Total retenciones esta partida:</span>
@@ -398,31 +394,26 @@
                         <span class="font-bold text-gray-800">${{ number_format($row['total_neto'] ?? 0, 2) }}</span>
                     </div>
                     @endif
-                
                 </div>
                 @endif
-                
-
 
                 {{-- Link --}}
                 <div class="grid grid-cols-12 gap-3">
                     <div class="col-span-12 sm:col-span-8">
                         <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Link de referencia</label>
-                        {{-- Cambiado a type="text" para soportar URLs largas --}}
                         <input type="text" wire:model.live="items.{{ $i }}.link_compra"
                                placeholder="https://... (pega aquí el link del producto)"
                                class="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
                     </div>
                 </div>
 
-             {{-- Archivos --}}
+                {{-- Archivos --}}
                 <div>
                     <label class="block mb-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                         Archivos adjuntos
                         <span class="font-normal text-gray-300 normal-case">(fichas técnicas, cotizaciones — máx. 5)</span>
                     </label>
-                
-                    {{-- Archivos ya guardados en BD --}}
+
                     @if(!empty($row['archivos_existentes']))
                     <div class="flex flex-wrap gap-2 mb-2">
                         @foreach($row['archivos_existentes'] as $arch)
@@ -444,8 +435,7 @@
                         @endforeach
                     </div>
                     @endif
-                
-                    {{-- Archivo heredado histórico --}}
+
                     @if(!empty($row['ficha_tecnica_path']) && empty($row['archivos_existentes']))
                     <div class="mb-2">
                         <a href="{{ Storage::disk('public')->url($row['ficha_tecnica_path']) }}" target="_blank"
@@ -455,8 +445,7 @@
                         </a>
                     </div>
                     @endif
-                
-                    {{-- Archivos nuevos en cola (acumulados, con X para quitar) --}}
+
                     @if(!empty($archivos_nuevos[$i]))
                     <div class="flex flex-wrap gap-2 mb-2">
                         @foreach($archivos_nuevos[$i] as $j => $nuevoArch)
@@ -482,13 +471,12 @@
                         @endforeach
                     </div>
                     @endif
-                
-                    {{-- Botón adjuntar — un archivo a la vez para acumular correctamente --}}
+
                     @php
                         $totalArch = count($row['archivos_existentes'] ?? [])
                                 + count(array_filter($archivos_nuevos[$i] ?? []));
                     @endphp
-                
+
                     @if($totalArch < 5)
                     <div class="flex items-center gap-2">
                         <label class="inline-flex items-center gap-2 px-3 py-2 text-xs text-gray-500 transition-colors border border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
@@ -499,14 +487,13 @@
                             @if($totalArch > 0)
                                 <span class="text-gray-400">({{ $totalArch }}/5)</span>
                             @endif
-                            {{-- Un archivo a la vez: sin multiple, con wire:model para acumular --}}
                             <input type="file"
                                 wire:model="archivo_temp"
                                 wire:change="$set('archivo_temp_index', {{ $i }})"
                                 accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
                                 class="hidden">
                         </label>
-                
+
                         <div wire:loading wire:target="archivo_temp"
                             class="inline-flex items-center gap-1 text-xs text-purple-500">
                             <svg class="w-3 h-3 animate-spin" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -518,12 +505,11 @@
                     @else
                     <p class="text-xs text-amber-500">⚠️ Límite de 5 archivos alcanzado</p>
                     @endif
-                
+
                     @error("archivos_nuevos.$i")
                         <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                     @enderror
                 </div>
-                
 
             </div>
             @endforeach
@@ -568,7 +554,6 @@
         </div>
     </div>
 
-
     {{-- ══ ACCIONES ══════════════════════════════════════════════════════ --}}
     <div class="flex items-center justify-end gap-3 pb-6">
         <a href="{{ route('requisiciones.index') }}"
@@ -606,6 +591,16 @@
                 class="px-6 py-2.5 text-sm font-bold text-white bg-orange-600 rounded-lg hover:bg-orange-700 shadow-md hover:shadow-lg transition-all disabled:opacity-50">
             <span wire:loading.remove wire:target="reenviarACompras">↩️ Reenviar a Compras</span>
             <span wire:loading wire:target="reenviarACompras">Reenviando…</span>
+        </button>
+        @endif
+
+        @if(in_array($estado_actual, ['en_revision_compras', 'aprobada_compras', 'en_aprobacion']))
+        <button type="button" wire:click.prevent="saveDraft"
+                wire:loading.attr="disabled" wire:target="saveDraft"
+                class="px-6 py-2.5 text-sm font-bold text-white rounded-lg shadow-md hover:shadow-lg transition-all disabled:opacity-50"
+                style="background: linear-gradient(135deg, #4A1660, #7c3aed);">
+            <span wire:loading.remove wire:target="saveDraft">💾 Guardar cambios</span>
+            <span wire:loading wire:target="saveDraft">Guardando…</span>
         </button>
         @endif
     </div>
