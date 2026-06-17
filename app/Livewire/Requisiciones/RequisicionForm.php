@@ -389,12 +389,20 @@ class RequisicionForm extends Component
     private function generateFolio(Carbon $fecha): string
     {
         $prefix = 'REQ-' . $fecha->format('ym') . '-';
-        $count  = Requisicion::whereYear('fecha_emision', $fecha->year)
-            ->whereMonth('fecha_emision', $fecha->month)
-            ->count() + 1;
 
-        return $prefix . str_pad((string) $count, 4, '0', STR_PAD_LEFT);
-    }
+        $ultimo = Requisicion::whereYear('fecha_emision', $fecha->year)
+            ->whereMonth('fecha_emision', $fecha->month)
+            ->orderByDesc('id')
+            ->value('folio');
+
+        if ($ultimo) {
+            $numero = (int) substr($ultimo, -4) + 1;
+        } else {
+            $numero = 1;
+        }
+
+        return $prefix . str_pad((string) $numero, 4, '0', STR_PAD_LEFT);
+}
 
     // ─── Acciones ─────────────────────────────────────────────────────────────
 
