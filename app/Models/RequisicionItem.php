@@ -35,7 +35,7 @@ class RequisicionItem extends Model
     ];
 
     protected $casts = [
-        'cantidad'         => 'integer',
+        'cantidad'         => 'decimal:4',
         'precio_unitario'  => 'decimal:2',
         'subtotal'         => 'decimal:2',
         'monto_impuesto'   => 'decimal:2',

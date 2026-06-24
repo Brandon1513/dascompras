@@ -43,7 +43,7 @@ class Requisicion extends Model
         'cerrado_en',
         'notas_cierre',
 
-
+        'oc_netsuite',
         'metodo_pago',
         'observaciones_compras',
         // Campos de revisión (nuevo flujo)

@@ -12,18 +12,16 @@ use PhpOffice\PhpSpreadsheet\Style\Border;
 
 class RequisicionExportController extends Controller
 {
-    // ── Colores ───────────────────────────────────────────────────────────
-    const COLOR_HEADER_REQ    = '4A1660'; // morado corporativo — columnas de requisición
-    const COLOR_HEADER_ITEM   = '6D28D9'; // violeta — columnas de partida
-    const COLOR_HEADER_RET    = 'BE123C'; // rojo oscuro — columnas de retención
-    const COLOR_ROW_EVEN      = 'F9F5FF'; // fila par suave
-    const COLOR_ROW_RET       = 'FFF1F2'; // fila con retenciones
+    const COLOR_HEADER_REQ    = '4A1660';
+    const COLOR_HEADER_ITEM   = '6D28D9';
+    const COLOR_HEADER_RET    = 'BE123C';
+    const COLOR_ROW_EVEN      = 'F9F5FF';
+    const COLOR_ROW_RET       = 'FFF1F2';
 
     public function export(Request $request)
     {
         abort_unless(auth()->user()->hasAnyRole(['compras', 'administrador']), 403);
 
-        // ── Filtros ───────────────────────────────────────────────────────
         $desde         = $request->query('desde');
         $hasta         = $request->query('hasta');
         $metodo_pago   = $request->query('metodo_pago');
@@ -50,15 +48,10 @@ class RequisicionExportController extends Controller
             ->orderBy('fecha_emision', 'desc')
             ->get();
 
-        // ── Spreadsheet ───────────────────────────────────────────────────
         $spreadsheet = new Spreadsheet();
         $sheet       = $spreadsheet->getActiveSheet();
         $sheet->setTitle('Requisiciones');
 
-        // ── Definición de columnas ────────────────────────────────────────
-        // Grupo A: datos de la requisición
-        // Grupo B: datos de la partida
-        // Grupo C: retenciones (solo si la requi es pago de factura)
         $headers = [
             // ── Requisición ────────────────────────────────────────────
             'A'  => ['label' => 'Folio',               'grupo' => 'req'],
@@ -71,31 +64,31 @@ class RequisicionExportController extends Controller
             'H'  => ['label' => 'Método pago general',  'grupo' => 'req'],
             'I'  => ['label' => '¿Tiene factura?',      'grupo' => 'req'],
             'J'  => ['label' => 'UUID / Folio Fiscal',  'grupo' => 'req'],
-            'K'  => ['label' => 'Revisado por',         'grupo' => 'req'],
-            'L'  => ['label' => 'Fecha revisión',       'grupo' => 'req'],
-            'M'  => ['label' => 'Cerrado por',          'grupo' => 'req'],
-            'N'  => ['label' => 'Fecha cierre',         'grupo' => 'req'],
-            'O'  => ['label' => 'Notas de cierre',      'grupo' => 'req'],
+            'K'  => ['label' => 'OC Netsuite',          'grupo' => 'req'],
+            'L'  => ['label' => 'Revisado por',         'grupo' => 'req'],
+            'M'  => ['label' => 'Fecha revisión',       'grupo' => 'req'],
+            'N'  => ['label' => 'Cerrado por',          'grupo' => 'req'],
+            'O'  => ['label' => 'Fecha cierre',         'grupo' => 'req'],
+            'P'  => ['label' => 'Notas de cierre',      'grupo' => 'req'],
             // ── Partida ────────────────────────────────────────────────
-            'P'  => ['label' => '# Partida',            'grupo' => 'item'],
-            'Q'  => ['label' => 'Descripción',          'grupo' => 'item'],
-            'R'  => ['label' => 'Unidad',               'grupo' => 'item'],
-            'S'  => ['label' => 'Cantidad',             'grupo' => 'item'],
-            'T'  => ['label' => 'Precio unitario',      'grupo' => 'item'],
-            'U'  => ['label' => 'Subtotal partida',     'grupo' => 'item'],
-            'V'  => ['label' => 'Impuesto',             'grupo' => 'item'],
-            'W'  => ['label' => 'Monto impuesto',       'grupo' => 'item'],
-            'X'  => ['label' => 'Total partida',        'grupo' => 'item'],
-            'Y'  => ['label' => 'Método pago partida',  'grupo' => 'item'],
-            'Z'  => ['label' => 'Proveedor sugerido',   'grupo' => 'item'],
-            'AA' => ['label' => 'Link referencia',      'grupo' => 'item'],
+            'Q'  => ['label' => '# Partida',            'grupo' => 'item'],
+            'R'  => ['label' => 'Descripción',          'grupo' => 'item'],
+            'S'  => ['label' => 'Unidad',               'grupo' => 'item'],
+            'T'  => ['label' => 'Cantidad',             'grupo' => 'item'],
+            'U'  => ['label' => 'Precio unitario',      'grupo' => 'item'],
+            'V'  => ['label' => 'Subtotal partida',     'grupo' => 'item'],
+            'W'  => ['label' => 'Impuesto',             'grupo' => 'item'],
+            'X'  => ['label' => 'Monto impuesto',       'grupo' => 'item'],
+            'Y'  => ['label' => 'Total partida',        'grupo' => 'item'],
+            'Z'  => ['label' => 'Método pago partida',  'grupo' => 'item'],
+            'AA' => ['label' => 'Proveedor sugerido',   'grupo' => 'item'],
+            'AB' => ['label' => 'Link referencia',      'grupo' => 'item'],
             // ── Retenciones ────────────────────────────────────────────
-            'AB' => ['label' => 'Retenciones aplicadas','grupo' => 'ret'],
-            'AC' => ['label' => 'Monto retenciones',    'grupo' => 'ret'],
-            'AD' => ['label' => 'Total neto partida',   'grupo' => 'ret'],
+            'AC' => ['label' => 'Retenciones aplicadas','grupo' => 'ret'],
+            'AD' => ['label' => 'Monto retenciones',    'grupo' => 'ret'],
+            'AE' => ['label' => 'Total neto partida',   'grupo' => 'ret'],
         ];
 
-        // ── Encabezados con color por grupo ──────────────────────────────
         $sheet->getRowDimension(1)->setRowHeight(24);
 
         $colorPorGrupo = [
@@ -132,7 +125,6 @@ class RequisicionExportController extends Controller
             ]);
         }
 
-        // ── Filas de datos: una por partida ───────────────────────────────
         $row = 2;
         foreach ($requisiciones as $r) {
 
@@ -144,7 +136,6 @@ class RequisicionExportController extends Controller
                 null  => '—',
             };
 
-            // Datos fijos de la requisición (se repiten en cada partida)
             $datosReq = [
                 'A' => $r->folio,
                 'B' => optional($r->fecha_emision)->format('d/m/Y'),
@@ -156,19 +147,19 @@ class RequisicionExportController extends Controller
                 'H' => $r->metodo_pago ? ucfirst($r->metodo_pago) : '—',
                 'I' => $tieneFacturaLabel,
                 'J' => $r->uuid_factura ?? '—',
-                'K' => $r->revisadoPor?->name ?? '—',
-                'L' => optional($r->revisado_en)?->format('d/m/Y H:i') ?? '—',
-                'M' => $r->cerradoPor?->name ?? '—',
-                'N' => optional($r->cerrado_en)?->format('d/m/Y H:i') ?? '—',
-                'O' => $r->notas_cierre ?? '—',
+                'K' => $r->oc_netsuite ?? '—',
+                'L' => $r->revisadoPor?->name ?? '—',
+                'M' => optional($r->revisado_en)?->format('d/m/Y H:i') ?? '—',
+                'N' => $r->cerradoPor?->name ?? '—',
+                'O' => optional($r->cerrado_en)?->format('d/m/Y H:i') ?? '—',
+                'P' => $r->notas_cierre ?? '—',
             ];
 
-            // Si la requisición no tiene partidas, escribir una fila con —
             if ($r->items->isEmpty()) {
                 foreach ($datosReq as $col => $val) {
                     $sheet->setCellValue("{$col}{$row}", $val);
                 }
-                foreach (['P','Q','R','S','T','U','V','W','X','Y','Z','AA','AB','AC','AD'] as $col) {
+                foreach (['Q','R','S','T','U','V','W','X','Y','Z','AA','AB','AC','AD','AE'] as $col) {
                     $sheet->setCellValue("{$col}{$row}", '—');
                 }
                 $this->aplicarEstiloFila($sheet, $row, array_keys($headers), false, false);
@@ -176,63 +167,55 @@ class RequisicionExportController extends Controller
                 continue;
             }
 
-            // Una fila por partida
             foreach ($r->items as $i => $it) {
 
-                // Datos de la requisición
                 foreach ($datosReq as $col => $val) {
                     $sheet->setCellValue("{$col}{$row}", $val);
                 }
 
-                // Unidad
                 $unidadLabel = $it->unidadMedida?->abreviatura ?? $it->unidad ?? '—';
 
-                // Retenciones: nombres concatenados
                 $retencionesNombres = $it->retenciones->map(function ($ret) {
                     return $ret->tipoRetencion?->nombre ?? '—';
                 })->implode(', ');
 
                 $tieneRetenciones = (float)($it->monto_retenciones ?? 0) > 0;
 
-                // Datos de la partida
-                $sheet->setCellValue("P{$row}", $i + 1);
-                $sheet->setCellValue("Q{$row}", $it->descripcion);
-                $sheet->setCellValue("R{$row}", $unidadLabel);
-                $sheet->setCellValue("S{$row}", (float) $it->cantidad);
-                $sheet->setCellValue("T{$row}", (float) $it->precio_unitario);
-                $sheet->setCellValue("U{$row}", (float) $it->subtotal);
-                $sheet->setCellValue("V{$row}", $it->tipoImpuesto?->nombre ?? '—');
-                $sheet->setCellValue("W{$row}", (float) $it->monto_impuesto);
-                $sheet->setCellValue("X{$row}", (float) $it->total_item);
-                $sheet->setCellValue("Y{$row}", $it->metodo_pago ? ucfirst($it->metodo_pago) : '—');
-                $sheet->setCellValue("Z{$row}", $it->proveedor_sugerido ?? '—');
-                $sheet->setCellValue("AA{$row}", $it->link_compra ?? '—');
+                $sheet->setCellValue("Q{$row}", $i + 1);
+                $sheet->setCellValue("R{$row}", $it->descripcion);
+                $sheet->setCellValue("S{$row}", $unidadLabel);
+                $sheet->setCellValue("T{$row}", (float) $it->cantidad);
+                $sheet->setCellValue("U{$row}", (float) $it->precio_unitario);
+                $sheet->setCellValue("V{$row}", (float) $it->subtotal);
+                $sheet->setCellValue("W{$row}", $it->tipoImpuesto?->nombre ?? '—');
+                $sheet->setCellValue("X{$row}", (float) $it->monto_impuesto);
+                $sheet->setCellValue("Y{$row}", (float) $it->total_item);
+                $sheet->setCellValue("Z{$row}", $it->metodo_pago ? ucfirst($it->metodo_pago) : '—');
+                $sheet->setCellValue("AA{$row}", $it->proveedor_sugerido ?? '—');
+                $sheet->setCellValue("AB{$row}", $it->link_compra ?? '—');
 
-                // Columnas de retención
                 if ($tieneRetenciones) {
-                    $sheet->setCellValue("AB{$row}", $retencionesNombres ?: '—');
-                    $sheet->setCellValue("AC{$row}", (float) $it->monto_retenciones);
-                    $sheet->setCellValue("AD{$row}", (float) $it->total_neto);
+                    $sheet->setCellValue("AC{$row}", $retencionesNombres ?: '—');
+                    $sheet->setCellValue("AD{$row}", (float) $it->monto_retenciones);
+                    $sheet->setCellValue("AE{$row}", (float) $it->total_neto);
                 } else {
-                    $sheet->setCellValue("AB{$row}", '—');
                     $sheet->setCellValue("AC{$row}", '—');
                     $sheet->setCellValue("AD{$row}", '—');
+                    $sheet->setCellValue("AE{$row}", '—');
                 }
 
-                // Formato numérico para columnas monetarias
-                $moneyCols = ['T', 'U', 'W', 'X'];
+                $moneyCols = ['U', 'V', 'X', 'Y'];
                 foreach ($moneyCols as $mc) {
                     $sheet->getStyle("{$mc}{$row}")
                         ->getNumberFormat()
                         ->setFormatCode('"$"#,##0.00');
                 }
                 if ($tieneRetenciones) {
-                    $sheet->getStyle("AC{$row}")->getNumberFormat()->setFormatCode('"$"#,##0.00');
                     $sheet->getStyle("AD{$row}")->getNumberFormat()->setFormatCode('"$"#,##0.00');
+                    $sheet->getStyle("AE{$row}")->getNumberFormat()->setFormatCode('"$"#,##0.00');
                 }
 
-                // Cantidad como número entero si es entera
-                $sheet->getStyle("S{$row}")->getNumberFormat()->setFormatCode('#,##0.##');
+                $sheet->getStyle("T{$row}")->getNumberFormat()->setFormatCode('#,##0.##');
 
                 $this->aplicarEstiloFila(
                     $sheet,
@@ -246,27 +229,20 @@ class RequisicionExportController extends Controller
             }
         }
 
-        // ── Autosize ──────────────────────────────────────────────────────
         foreach (array_keys($headers) as $col) {
             $sheet->getColumnDimension($col)->setAutoSize(true);
         }
 
-        // Limitar ancho máximo para columnas de texto largo
-        foreach (['O', 'Q', 'AA', 'AB'] as $col) {
+        foreach (['P', 'R', 'AB', 'AC'] as $col) {
             $sheet->getColumnDimension($col)->setAutoSize(false);
             $sheet->getColumnDimension($col)->setWidth(35);
             $sheet->getStyle("{$col}2:{$col}{$row}")
                 ->getAlignment()->setWrapText(true);
         }
 
-        // ── Freeze primera fila ───────────────────────────────────────────
         $sheet->freezePane('A2');
+        $sheet->setAutoFilter("A1:AE1");
 
-        // ── Filtros automáticos ───────────────────────────────────────────
-        $lastCol = 'AD';
-        $sheet->setAutoFilter("A1:{$lastCol}1");
-
-        // ── Descargar ─────────────────────────────────────────────────────
         $filename = 'Requisiciones_Desglosado_' . now()->format('Ymd_His') . '.xlsx';
         $writer   = new Xlsx($spreadsheet);
 
@@ -280,9 +256,6 @@ class RequisicionExportController extends Controller
         );
     }
 
-    /**
-     * Aplica estilo de fila: alternado y resaltado de retenciones.
-     */
     private function aplicarEstiloFila(
         $sheet,
         int $row,
@@ -290,10 +263,9 @@ class RequisicionExportController extends Controller
         bool $esPareja,
         bool $tieneRetenciones
     ): void {
-        $last = end($cols);
+        $last  = end($cols);
         $rango = "A{$row}:{$last}{$row}";
 
-        // Fuente base
         $sheet->getStyle($rango)->applyFromArray([
             'font'      => ['name' => 'Arial', 'size' => 9],
             'alignment' => ['vertical' => Alignment::VERTICAL_TOP],
@@ -305,15 +277,12 @@ class RequisicionExportController extends Controller
             ],
         ]);
 
-        // Color fondo alterno
         if ($tieneRetenciones) {
-            // Columnas de retención con fondo rosa suave
-            $sheet->getStyle("AB{$row}:AD{$row}")->applyFromArray([
+            $sheet->getStyle("AC{$row}:AE{$row}")->applyFromArray([
                 'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'FFF1F2']],
                 'font' => ['color' => ['rgb' => '9F1239']],
             ]);
-            // Resto de la fila
-            $sheet->getStyle("A{$row}:AA{$row}")->applyFromArray([
+            $sheet->getStyle("A{$row}:AB{$row}")->applyFromArray([
                 'fill' => [
                     'fillType'   => Fill::FILL_SOLID,
                     'startColor' => ['rgb' => $esPareja ? 'F9F5FF' : 'FFFFFF'],
@@ -328,18 +297,15 @@ class RequisicionExportController extends Controller
             ]);
         }
 
-        // Folio en negrita
         $sheet->getStyle("A{$row}")->getFont()->setBold(true);
 
-        // Alineación derecha para columnas numéricas
-        foreach (['S','T','U','W','X','AC','AD'] as $col) {
+        foreach (['T','U','V','X','Y','AD','AE'] as $col) {
             $sheet->getStyle("{$col}{$row}")
                 ->getAlignment()
                 ->setHorizontal(Alignment::HORIZONTAL_RIGHT);
         }
 
-        // # Partida centrado
-        $sheet->getStyle("P{$row}")
+        $sheet->getStyle("Q{$row}")
             ->getAlignment()
             ->setHorizontal(Alignment::HORIZONTAL_CENTER);
     }

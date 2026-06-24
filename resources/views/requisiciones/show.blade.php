@@ -475,6 +475,59 @@
                     </div>
                 </div>
             </div>
+            {{-- ══ OC NETSUITE (solo compras/admin, desde aprobada_final en adelante) ══ --}}
+            @if(Auth::user()->hasAnyRole(['compras', 'administrador']) &&
+                in_array($requisicion->estado, ['aprobada_final', 'pendiente_cierre', 'recibida']))
+            <div class="bg-white rounded-xl shadow-sm border border-indigo-100 overflow-hidden">
+                <div class="flex items-center gap-2 px-5 py-3 border-b border-indigo-100 bg-indigo-50">
+                    <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+                    </svg>
+                    <h3 class="text-xs font-bold text-indigo-700 uppercase tracking-widest">OC Netsuite</h3>
+                    <span class="text-[10px] text-indigo-400 font-normal ml-1">— Uso interno Compras</span>
+                </div>
+                <div class="p-5">
+                    @if(session('oc_guardado'))
+                        <div class="flex items-center gap-2 p-3 mb-3 text-sm font-medium text-emerald-800 border border-emerald-200 rounded-lg bg-emerald-50">
+                            ✅ OC Netsuite guardada correctamente.
+                        </div>
+                    @endif
+
+                    <form method="POST" action="{{ route('requisiciones.oc-netsuite', $requisicion) }}"
+                        class="flex items-end gap-3">
+                        @csrf @method('PATCH')
+                        <div class="flex-1">
+                            <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                                Número de OC en Netsuite
+                            </label>
+                            <input type="text"
+                                name="oc_netsuite"
+                                value="{{ old('oc_netsuite', $requisicion->oc_netsuite) }}"
+                                placeholder="Ej. OC-2026-00123"
+                                class="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500
+                                        @error('oc_netsuite') border-red-400 @enderror">
+                            @error('oc_netsuite')
+                                <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+                        <button type="submit"
+                                class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-white rounded-lg shadow-sm hover:shadow-md transition-all"
+                                style="background: linear-gradient(135deg, #4338ca, #6d28d9);">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            Guardar
+                        </button>
+                    </form>
+
+                    @if($requisicion->oc_netsuite)
+                    <p class="mt-2 text-xs text-gray-400">
+                        OC actual: <span class="font-semibold text-indigo-700">{{ $requisicion->oc_netsuite }}</span>
+                    </p>
+                    @endif
+                </div>
+            </div>
+            @endif
 
             {{-- ══ CADENA DE APROBACIONES ══════════════════════════════ --}}
             <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-xl">

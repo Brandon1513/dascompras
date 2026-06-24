@@ -123,6 +123,8 @@ Route::middleware(['auth'])->group(function () {
         CerrarRequisicion::class
     )->name('requisiciones.cerrar')
      ->middleware('role:compras|administrador');
+
+     Route::patch('/requisiciones/{requisicion}/oc-netsuite', [RequisicionController::class, 'guardarOcNetsuite'])->name('requisiciones.oc-netsuite');
  
     // ── Ruta dinámica SIEMPRE AL FINAL ───────────────────────
     Route::get('/requisiciones/{requisicion}',
@@ -163,11 +165,5 @@ Route::middleware(['auth', 'role:administrador|compras'])->prefix('catalogos')->
 });
 
 Route::get('/ayuda', fn() => view('ayuda'))->name('ayuda');
-
-
- 
-
-
-
 
 require __DIR__.'/auth.php';

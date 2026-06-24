@@ -2,9 +2,9 @@
 <div class="max-w-5xl px-4 mx-auto space-y-4 sm:px-6 lg:px-8">
 
     @error('general')
-        <div class="flex items-center gap-2 p-4 text-sm font-medium text-red-800 border border-red-200 rounded-xl bg-red-50">
-            ⚠️ {{ $message }}
-        </div>
+    <div class="flex items-center gap-2 p-4 text-sm font-medium text-red-800 border border-red-200 rounded-xl bg-red-50">
+    ⚠️ {{ $message }}
+    </div>
     @enderror
 
     {{-- ══ LEYENDA ══════════════════════════════════════════════════════ --}}
@@ -101,7 +101,7 @@
                 <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                     Justificación de la compra <span class="text-red-400">*</span>
                 </label>
-                <textarea rows="3" wire:model.live="justificacion"
+                <textarea rows="3" wire:model.blur="justificacion"
                           placeholder="Describe la necesidad o motivo de la compra..."
                           class="w-full rounded-lg border-gray-200 text-sm shadow-sm focus:ring-purple-500 focus:border-purple-500 resize-none
                                  @error('justificacion') border-red-400 @enderror"></textarea>
@@ -256,7 +256,7 @@
                         <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                             Descripción <span class="text-red-400">*</span>
                         </label>
-                        <input type="text" wire:model.live="items.{{ $i }}.descripcion"
+                        <input type="text" wire:model.blur="items.{{ $i }}.descripcion"
                                placeholder="Producto o servicio"
                                class="w-full rounded-lg border-gray-200 text-sm shadow-sm focus:ring-purple-500 focus:border-purple-500
                                       @error("items.$i.descripcion") border-red-400 @enderror">
@@ -265,9 +265,11 @@
 
                     <div class="col-span-4 sm:col-span-2">
                         <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Cantidad</label>
-                        <input type="number" step="1" min="1"
-                               wire:model.blur="items.{{ $i }}.cantidad"
-                               class="w-full text-sm text-right border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                        <input type="number" step="0.01" min="0.01"
+                            wire:model.blur="items.{{ $i }}.cantidad"
+                            class="w-full text-sm text-right border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500
+                            @error("items.$i.cantidad") border-red-400 @enderror">
+                            @error("items.$i.cantidad") <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                     </div>
 
                     <div class="col-span-8 sm:col-span-3">
@@ -288,6 +290,7 @@
                             <input type="number" step="0.01" min="0"
                                    wire:model.blur="items.{{ $i }}.precio_unitario"
                                    class="w-full pl-6 text-sm text-right border-gray-200 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                                   @error("items.$i.precio_unitario") <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                         </div>
                     </div>
                 </div>
@@ -303,6 +306,7 @@
                                 <option value="{{ $ti['id'] }}">{{ $ti['nombre'] }}</option>
                             @endforeach
                         </select>
+                        @error("items.$i.tipo_impuesto_id") <p class="mt-1 text-xs text-red-500">{{ $message }}</p> @enderror
                     </div>
 
                     <div class="col-span-12 sm:col-span-3">

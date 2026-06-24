@@ -306,5 +306,27 @@ class RequisicionController extends Controller
     return $prefijo . '-' . str_pad($consecutivo, 4, '0', STR_PAD_LEFT);
 }
 
+public function guardarOcNetsuite(Request $request, Requisicion $requisicion)
+    {
+        abort_unless(
+            auth()->user()->hasAnyRole(['compras', 'administrador']),
+            403
+        );
 
+        abort_unless(
+            in_array($requisicion->estado, ['aprobada_final', 'pendiente_cierre', 'recibida']),
+            403,
+            'No se puede registrar OC en este estado.'
+        );
+
+        $data = $request->validate([
+            'oc_netsuite' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $requisicion->update(['oc_netsuite' => $data['oc_netsuite'] ?? null]);
+
+        return redirect()
+            ->route('requisiciones.show', $requisicion)
+            ->with('oc_guardado', true);
+    }
 }
