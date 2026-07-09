@@ -106,6 +106,10 @@ class Requisicion extends Model
 
     // ─── Relaciones ───────────────────────────────────────────────────────
 
+      public function actividades(): HasMany
+    {
+        return $this->hasMany(RequisicionActividad::class)->orderBy('created_at');
+    }
     public function departamento(): BelongsTo
     {
         return $this->belongsTo(Departamento::class, 'departamento_id');

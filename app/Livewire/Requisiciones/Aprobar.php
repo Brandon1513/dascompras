@@ -3,7 +3,9 @@
 namespace App\Livewire\Requisiciones;
 
 use App\Models\Aprobacion;
+use App\Models\NotificacionInterna;
 use App\Models\Requisicion;
+use App\Models\RequisicionActividad;
 use App\Models\User;
 use App\Notifications\RequisicionAprobadaFinal;
 use App\Notifications\RequisicionRechazada;
@@ -21,52 +23,34 @@ class Aprobar extends Component
 
     public Requisicion $requisicion;
     public string $comentarios = '';
-
     public ?Aprobacion $apPendiente = null;
     public ?Aprobacion $siguientePendiente = null;
     public bool $yaFirmoEnEstaReq = false;
-
     public ?string $firma_base64 = null;
 
     public function mount(Requisicion $requisicion): void
     {
-        // view para que no truene si recarga y ya no le toca
         $this->authorize('view', $requisicion);
-
         $this->requisicion = $requisicion;
-
         $this->requisicion->load([
-            'solicitante',
-            'departamentoRef',
-            'centroCostoRef',
-            'items.unidadMedida',
-            'items.tipoImpuesto',
-            'items.archivos',
-            'aprobaciones.nivel',
-            'aprobaciones.aprobador',
+            'solicitante', 'departamentoRef', 'centroCostoRef',
+            'items.unidadMedida', 'items.tipoImpuesto', 'items.archivos',
+            'aprobaciones.nivel', 'aprobaciones.aprobador',
         ]);
-
         $this->apPendiente = $this->miAprobacionPendiente();
-
         $this->yaFirmoEnEstaReq = Aprobacion::where('requisicion_id', $this->requisicion->id)
             ->where('aprobador_id', Auth::id())
             ->whereIn('estado', ['aprobada', 'rechazada'])
             ->exists();
-
         $this->siguientePendiente = $this->aprobacionActualPendiente();
     }
 
-    /** Mapa de roles lógicos → roles reales (Spatie) */
     private function rolesQuePuedenFirmar(string $rolAprobador): array
     {
-        $map = [
-            'gerencia_alta' => ['gerencia_adm', 'gerencia_finanzas'],
-        ];
-
+        $map = ['gerencia_alta' => ['gerencia_adm', 'gerencia_finanzas']];
         return $map[$rolAprobador] ?? [$rolAprobador];
     }
 
-    /** ✅ Obtiene SOLO la aprobación actual: primera pendiente por orden de nivel */
     private function aprobacionActualPendiente(): ?Aprobacion
     {
         return Aprobacion::query()
@@ -80,37 +64,26 @@ class Aprobar extends Component
             ->first();
     }
 
-    /** ✅ Valida si el usuario puede firmar ESA aprobación */
     private function puedeFirmar(Aprobacion $ap, User $user): bool
     {
-        // Si está asignada a un usuario específico, solo él
         if (!is_null($ap->aprobador_id)) {
             return (int)$ap->aprobador_id === (int)$user->id;
         }
-
-        // Si es por rol:
         $rol = $ap->nivel?->rol_aprobador;
         if (!$rol) return false;
-
-        // Caso especial: gerente_area por rol (por si alguna vez queda null)
         if ($rol === 'gerente_area') {
             $gerenteId = $this->requisicion->departamentoRef()->value('gerente_id');
             if ((int)$gerenteId !== (int)$user->id) return false;
             return $user->hasRole('gerente_area');
         }
-
-        $roles = $this->rolesQuePuedenFirmar($rol);
-        return $user->hasAnyRole($roles);
+        return $user->hasAnyRole($this->rolesQuePuedenFirmar($rol));
     }
 
-    /** ✅ La aprobación pendiente que me corresponde (solo si soy el que debe firmar AHORA) */
     private function miAprobacionPendiente(): ?Aprobacion
     {
-        $user = Auth::user();
         $apActual = $this->aprobacionActualPendiente();
         if (!$apActual) return null;
-
-        return $this->puedeFirmar($apActual, $user) ? $apActual : null;
+        return $this->puedeFirmar($apActual, Auth::user()) ? $apActual : null;
     }
 
     public function approve()
@@ -121,17 +94,12 @@ class Aprobar extends Component
         }
 
         $siguiente = null;
-        $noMeToca = false;
+        $noMeToca  = false;
 
         DB::transaction(function () use (&$siguiente, &$noMeToca) {
             $ap = $this->miAprobacionPendiente();
+            if (!$ap) { $noMeToca = true; return; }
 
-            if (!$ap) {
-                $noMeToca = true;
-                return;
-            }
-
-            // Guardar la firma como PNG
             $png  = base64_decode(Str::after($this->firma_base64, 'data:image/png;base64,'));
             $path = "firmas/aprobaciones/req_{$this->requisicion->id}/ap_{$ap->id}.png";
             Storage::disk('public')->put($path, $png);
@@ -141,12 +109,10 @@ class Aprobar extends Component
                 'comentarios'  => $this->comentarios,
                 'firmado_en'   => now(),
                 'ip'           => request()->ip(),
-                // si venía null (firma por rol), registra quién fue
                 'aprobador_id' => $ap->aprobador_id ?: Auth::id(),
                 'firma_path'   => $path,
             ]);
 
-            // Siguiente aprobación (primera pendiente por orden)
             $siguiente = $this->aprobacionActualPendiente();
 
             if (!$siguiente) {
@@ -154,58 +120,112 @@ class Aprobar extends Component
             } else {
                 $this->requisicion->update(['estado' => 'en_aprobacion']);
             }
+
+            // Actividad
+            RequisicionActividad::registrar(
+                $this->requisicion->id,
+                'aprobada',
+                "Aprobada por " . Auth::user()->name . " — " . ($ap->nivel?->nombre ?? ''),
+                Auth::id(),
+            );
         });
 
         if ($noMeToca) {
-            session()->flash('status', '✅ No hay aprobaciones pendientes para ti (o ya avanzó el flujo).');
+            session()->flash('status', '✅ No hay aprobaciones pendientes para ti.');
             return redirect()->route('requisiciones.index');
         }
 
-        // Notificaciones
+        // Notificaciones email
         if ($siguiente) {
             app(FlujoAprobacionService::class)->notificarSiguiente($this->requisicion);
         } else {
             optional($this->requisicion->solicitante)
                 ->notify(new RequisicionAprobadaFinal($this->requisicion));
-
             User::role('compras')->get()
-                ->each(fn (User $u) => $u->notify(new RequisicionAprobadaFinal($this->requisicion)));
+                ->each(fn(User $u) => $u->notify(new RequisicionAprobadaFinal($this->requisicion)));
+        }
+
+        // Notificaciones internas
+        $aprobador = Auth::user();
+        $nivel     = $this->apPendiente?->nivel;
+
+        NotificacionInterna::enviar(
+            $this->requisicion->solicitante_id,
+            'aprobada',
+            "Tu requi {$this->requisicion->folio} fue aprobada por {$aprobador->name}",
+            $nivel ? "Nivel: {$nivel->nombre}" : null,
+            route('requisiciones.show', $this->requisicion),
+            $this->requisicion->id
+        );
+
+        if (!$siguiente) {
+            NotificacionInterna::enviar(
+                $this->requisicion->solicitante_id,
+                'accion_requerida',
+                "✅ {$this->requisicion->folio} completamente aprobada",
+                'Pronto recibirás los artículos. Te avisaremos cuando estén listos.',
+                route('requisiciones.show', $this->requisicion),
+                $this->requisicion->id
+            );
         }
 
         session()->flash('status', '✅ Aprobada correctamente. La requisición avanzó al siguiente nivel.');
         $this->js("window.location.href = '" . route('requisiciones.index') . "'");
     }
 
-   public function reject()
-{
-    $this->validate([
-        'comentarios' => ['required', 'string', 'min:10', 'max:1000'],
-    ], [
-        'comentarios.required' => 'El motivo del rechazo es obligatorio.',
-        'comentarios.min'      => 'El motivo debe tener al menos 10 caracteres.',
-    ]);
-
-    DB::transaction(function () {
-        $ap = $this->miAprobacionPendiente();
-        abort_unless($ap, 403);
-
-        $ap->update([
-            'estado'       => 'rechazada',
-            'comentarios'  => $this->comentarios,
-            'firmado_en'   => now(),
-            'ip'           => request()->ip(),
-            'aprobador_id' => $ap->aprobador_id ?: Auth::id(),
+    public function reject()
+    {
+        $this->validate([
+            'comentarios' => ['required', 'string', 'min:10', 'max:1000'],
+        ], [
+            'comentarios.required' => 'El motivo del rechazo es obligatorio.',
+            'comentarios.min'      => 'El motivo debe tener al menos 10 caracteres.',
         ]);
 
-        $this->requisicion->update(['estado' => 'rechazada']);
-    });
+        $aprobador = Auth::user();
 
-    optional($this->requisicion->solicitante)
-        ->notify(new RequisicionRechazada($this->requisicion, $this->comentarios));
+        DB::transaction(function () use ($aprobador) {
+            $ap = $this->miAprobacionPendiente();
+            abort_unless($ap, 403);
 
-    session()->flash('status', '⛔ Rechazada. Se notificó al solicitante con el motivo.');
-    $this->js("window.location.href = '" . route('requisiciones.index') . "'");
-}
+            $ap->update([
+                'estado'       => 'rechazada',
+                'comentarios'  => $this->comentarios,
+                'firmado_en'   => now(),
+                'ip'           => request()->ip(),
+                'aprobador_id' => $ap->aprobador_id ?: Auth::id(),
+            ]);
+
+            $this->requisicion->update(['estado' => 'rechazada']);
+
+            // Actividad
+            RequisicionActividad::registrar(
+                $this->requisicion->id,
+                'rechazada',
+                "Rechazada por {$aprobador->name}: {$this->comentarios}",
+                Auth::id(),
+                'en_aprobacion',
+                'rechazada'
+            );
+        });
+
+        // Notificación email
+        optional($this->requisicion->solicitante)
+            ->notify(new RequisicionRechazada($this->requisicion, $this->comentarios));
+
+        // Notificación interna
+        NotificacionInterna::enviar(
+            $this->requisicion->solicitante_id,
+            'rechazada',
+            "Tu requi {$this->requisicion->folio} fue rechazada",
+            "Rechazada por {$aprobador->name}: {$this->comentarios}",
+            route('requisiciones.show', $this->requisicion),
+            $this->requisicion->id
+        );
+
+        session()->flash('status', '⛔ Rechazada. Se notificó al solicitante con el motivo.');
+        $this->js("window.location.href = '" . route('requisiciones.index') . "'");
+    }
 
     public function render()
     {

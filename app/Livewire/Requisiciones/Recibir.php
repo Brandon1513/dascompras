@@ -1,9 +1,10 @@
 <?php
-
 namespace App\Livewire\Requisiciones;
 
 use App\Models\Departamento;
+use App\Models\NotificacionInterna;
 use App\Models\Requisicion;
+use App\Models\RequisicionActividad;
 use App\Models\User;
 use App\Notifications\RequisicionRecibidaParaCompras;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -20,7 +21,7 @@ class Recibir extends Component
 
     public Requisicion $requisicion;
     public string $fecha_recibido;
-    public string $area_recibe  = '';
+    public string $area_recibe   = '';
     public string $recibe_nombre = '';
     public ?string $firma_base64 = null;
     public array $departamentos  = [];
@@ -28,7 +29,6 @@ class Recibir extends Component
     public function mount(Requisicion $requisicion): void
     {
         $this->authorize('receive', $requisicion);
-
         $requisicion->load([
             'solicitante',
             'departamentoRef',
@@ -37,13 +37,11 @@ class Recibir extends Component
             'items.tipoImpuesto',
             'items.archivos',
         ]);
-
         $this->requisicion    = $requisicion;
         $this->fecha_recibido = now()->toDateString();
         $this->area_recibe    = $requisicion->departamentoRef?->nombre ?? '';
         $this->recibe_nombre  = Auth::user()?->name ?? '';
-
-        $this->departamentos = Departamento::orderBy('nombre')
+        $this->departamentos  = Departamento::orderBy('nombre')
             ->get(['id', 'nombre'])
             ->map(fn($d) => ['id' => $d->id, 'nombre' => $d->nombre])
             ->toArray();
@@ -81,12 +79,33 @@ class Recibir extends Component
             'estado'               => 'pendiente_cierre',
         ]);
 
+        // Registrar actividad
+        RequisicionActividad::registrar(
+            $this->requisicion->id,
+            'recibida',
+            "Recepción confirmada por {$this->recibe_nombre} — {$this->area_recibe}.",
+            null,
+            'aprobada_final',
+            'pendiente_cierre'
+        );
+
+        User::role('compras')->get()->each(fn($u) =>
+        NotificacionInterna::enviar(
+            $u->id,
+            'accion_requerida',
+            "Requi {$this->requisicion->folio} lista para cerrar",
+            "{$this->recibe_nombre} confirmó la recepción.",
+            route('requisiciones.cerrar', $this->requisicion),
+            $this->requisicion->id
+        )
+    );
+
+
+
         User::role('compras')->get()
             ->each(fn(User $u) => $u->notify(new RequisicionRecibidaParaCompras($this->requisicion)));
 
         session()->flash('status', 'Recepción registrada y notificada a Compras.');
-
-        // Redirect corregido para Livewire 3 sin navigate plugin
         $this->js("window.location.href = '" . route('requisiciones.index') . "'");
     }
 

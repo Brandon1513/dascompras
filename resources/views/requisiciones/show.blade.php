@@ -23,13 +23,12 @@
                         @endif
                     </div>
                     <p class="text-xs text-gray-400 mt-0.5">
-                        Emitida el {{ optional($requisicion->fecha_emision)->format('d/m/Y') }} 
+                        Emitida el {{ optional($requisicion->fecha_emision)->format('d/m/Y') }}
                         a las {{ $requisicion->created_at->format('h:i A') }}
                         · {{ $requisicion->solicitante?->name }}
                     </p>
                 </div>
             </div>
-
             <div class="flex items-center gap-2">
                 @php
                     $color = $requisicion->estadoColor;
@@ -51,7 +50,6 @@
                              {{ $color['bg'] }} {{ $color['text'] }} {{ $color['border'] }}">
                     {{ $estadoIcon }} {{ $requisicion->estado_label }}
                 </span>
-
                 @role('administrador|compras')
                 @if($requisicion->estado === 'en_revision_compras')
                     <a href="{{ route('requisiciones.revisar', $requisicion) }}"
@@ -64,7 +62,6 @@
                     </a>
                 @endif
                 @endrole
-
                 @if(in_array($requisicion->estado, ['aprobada_final','pendiente_cierre','recibida']))
                     <a href="{{ route('requisiciones.pdf', $requisicion) }}" target="_blank"
                        class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition">
@@ -81,8 +78,7 @@
     <div class="min-h-screen py-6" style="background: linear-gradient(160deg, #f8f5ff 0%, #f1f5f9 50%, #f8f5ff 100%);">
         <div class="max-w-5xl px-4 mx-auto space-y-4 sm:px-6 lg:px-8">
 
-            {{-- ══ BANNERS DE ESTADO ════════════════════════════════════ --}}
-            <div class="flex items-start gap-3 px-4 py-3 border rounded-xl border-amber-200/80 bg-amber-50/80 backdrop-blur-sm">
+            <div class="flex items-start gap-3 px-4 py-3 border rounded-xl border-amber-200/80 bg-amber-50/80">
                 <svg class="w-4 h-4 text-amber-500 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                     <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
                 </svg>
@@ -124,7 +120,7 @@
                     </div>
                     <p class="text-xs text-violet-800">
                         <span class="font-bold">En revisión de Compras.</span>
-                        El área está verificando la información antes de continuar con el proceso de aprobación.
+                        El área está verificando la información antes de continuar.
                     </p>
                 </div>
             @endif
@@ -139,7 +135,6 @@
                         </div>
                         <p class="text-xs text-cyan-800">
                             <span class="font-bold">Recibida — Pendiente de cierre por Compras.</span>
-                            El solicitante confirmó la recepción.
                         </p>
                     </div>
                     @role('administrador|compras')
@@ -151,7 +146,7 @@
                 </div>
             @endif
 
-            {{-- ══ DATOS GENERALES ════════════════════════════════════ --}}
+            {{-- DATOS GENERALES --}}
             <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-xl">
                 <div class="flex items-center gap-2 px-5 py-3 border-b border-gray-100"
                      style="background: linear-gradient(90deg, #4A1660 0%, #6d28d9 100%);">
@@ -165,7 +160,7 @@
                         <div>
                             <dt class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Fecha</dt>
                             <dd class="font-semibold text-gray-800">{{ optional($requisicion->fecha_emision)->format('d/m/Y') }}</dd>
-                            <dd class="text-xs text-gray-500"></dd>{{ $requisicion->created_at->format('h:i A') }}</dd>
+                            <dd class="text-xs text-gray-500">{{ $requisicion->created_at->format('h:i A') }}</dd>
                         </div>
                         <div>
                             <dt class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Solicitante</dt>
@@ -210,7 +205,6 @@
                         </div>
                         @endrole
                     </dl>
-
                     @if($requisicion->justificacion)
                     <div class="pt-4 mt-4 border-t border-gray-100">
                         <dt class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Justificación</dt>
@@ -220,27 +214,24 @@
                 </div>
             </div>
 
-            {{-- ══ LEYENDAS INFORMATIVAS ══════════════════════════════ --}}
             <div class="flex flex-wrap px-1 gap-x-8 gap-y-2">
                 <div class="flex items-start gap-2">
                     <span class="text-sm shrink-0 mt-0.5">📅</span>
                     <p class="text-xs leading-relaxed text-gray-500">
                         <span class="font-semibold text-gray-700">Plazo de entrega:</span>
-                        El plazo máximo es de <strong class="text-gray-700">15 días naturales</strong>
-                        a partir de la orden de compra, salvo casos especiales informados al solicitante.
+                        El plazo máximo es de <strong class="text-gray-700">15 días naturales</strong> a partir de la orden de compra.
                     </p>
                 </div>
                 <div class="flex items-start gap-2">
                     <span class="text-sm shrink-0 mt-0.5">💰</span>
                     <p class="text-xs leading-relaxed text-gray-500">
                         <span class="font-semibold text-gray-700">Programación de pagos:</span>
-                        Para que el pago aplique en la semana en curso, la factura debe recibirse a más tardar el
-                        <strong class="text-gray-700">lunes a las 12:00 pm</strong>.
+                        Factura a más tardar el <strong class="text-gray-700">lunes a las 12:00 pm</strong>.
                     </p>
                 </div>
             </div>
 
-            {{-- ══ FACTURA ADJUNTA ═════════════════════════════════════ --}}
+            {{-- FACTURA --}}
             @if($requisicion->es_pago_factura)
             <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-xl">
                 <div class="flex items-center gap-2 px-5 py-3 border-b border-gray-100 bg-violet-50">
@@ -254,25 +245,17 @@
                             <span class="text-2xl">📄</span>
                             <div>
                                 <p class="text-sm font-semibold text-violet-700 group-hover:underline">{{ $requisicion->factura_nombre ?? 'Ver factura' }}</p>
-                                <p class="text-xs text-violet-400">Clic para abrir el archivo</p>
+                                <p class="text-xs text-violet-400">Clic para abrir</p>
                             </div>
-                            <svg class="w-4 h-4 ml-2 text-violet-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
-                            </svg>
                         </a>
                     @else
-                        <p class="flex items-center gap-2 text-sm text-red-500">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                            </svg>
-                            Factura no adjunta
-                        </p>
+                        <p class="flex items-center gap-2 text-sm text-red-500">Factura no adjunta</p>
                     @endif
                 </div>
             </div>
             @endif
 
-            {{-- ══ OBSERVACIONES DE COMPRAS ════════════════════════════ --}}
+            {{-- OBSERVACIONES COMPRAS --}}
             @role('administrador|compras')
             @if($requisicion->observaciones_compras || $requisicion->revisadoPor)
             <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-xl">
@@ -289,7 +272,7 @@
                     @if($requisicion->observaciones_compras)
                         <p class="text-sm leading-relaxed text-gray-700 whitespace-pre-line">{{ $requisicion->observaciones_compras }}</p>
                     @else
-                        <p class="text-sm italic text-gray-400">Sin observaciones registradas.</p>
+                        <p class="text-sm italic text-gray-400">Sin observaciones.</p>
                     @endif
                     @if($requisicion->revisadoPor)
                     <p class="mt-3 text-xs text-gray-400">
@@ -302,11 +285,24 @@
             @endif
             @endrole
 
-            {{-- ══ PARTIDAS ════════════════════════════════════════════ --}}
+            {{-- ══ PARTIDAS ══════════════════════════════════════════════════════════ --}}
             @php
                 $hayRetenciones = $requisicion->es_pago_factura &&
                     $requisicion->items->sum(fn($it) => (float)($it->monto_retenciones ?? 0)) > 0;
+
+                // Compras/admin pueden hacer toggle solo en aprobada_final
+                $esComprasAdmin      = Auth::user()->hasAnyRole(['administrador', 'compras']);
+                $puedeToggle         = $esComprasAdmin && $requisicion->estado === 'aprobada_final';
+
+                // La columna Entregado se muestra si hay al menos uno entregado (todos los roles)
+                // O si es compras/admin en aprobada_final (para que puedan marcar aunque no haya ninguno aún)
+                $hayAlgunEntregado   = $requisicion->items->contains('entregado', true);
+                $mostrarColEntregado = $puedeToggle || $hayAlgunEntregado;
+
+                $totalItems      = $requisicion->items->count();
+                $totalEntregados = $requisicion->items->where('entregado', true)->count();
             @endphp
+
             <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-xl">
                 <div class="flex items-center gap-2 px-5 py-3 border-b border-gray-100"
                      style="background: linear-gradient(90deg, #4A1660 0%, #6d28d9 100%);">
@@ -314,6 +310,13 @@
                         <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
                     </svg>
                     <h3 class="text-xs font-bold tracking-widest text-white uppercase">Partidas</h3>
+                    {{-- Contador entregados visible para todos --}}
+                    @if($hayAlgunEntregado)
+                    <span class="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold
+                                 {{ $totalEntregados === $totalItems ? 'bg-emerald-500 text-white' : 'bg-white/20 text-white' }}">
+                        ✓ {{ $totalEntregados }}/{{ $totalItems }} entregados
+                    </span>
+                    @endif
                 </div>
                 <div class="overflow-x-auto">
                     <table class="min-w-full text-sm">
@@ -331,6 +334,9 @@
                                 <th class="px-4 py-3 text-right text-[10px] font-bold text-rose-400 uppercase tracking-wider">Retenciones</th>
                                 @endif
                                 <th class="px-4 py-3 text-right text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total</th>
+                                @if($mostrarColEntregado)
+                                <th class="px-4 py-3 text-center text-[10px] font-bold text-emerald-500 uppercase tracking-wider">Entregado</th>
+                                @endif
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-50">
@@ -348,14 +354,13 @@
                                                 link
                                             </a>
                                         @endif
-                                        {{-- Método de pago por partida (solo compras/admin) --}}
                                         @role('administrador|compras')
                                         @if($it->metodo_pago)
                                             <span @class([
                                                 'ml-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold',
-                                                'bg-blue-50 text-blue-600'   => $it->metodo_pago === 'transferencia',
+                                                'bg-blue-50 text-blue-600'     => $it->metodo_pago === 'transferencia',
                                                 'bg-purple-50 text-purple-600' => $it->metodo_pago === 'tarjeta',
-                                                'bg-green-50 text-green-600'  => $it->metodo_pago === 'efectivo',
+                                                'bg-green-50 text-green-600'   => $it->metodo_pago === 'efectivo',
                                             ])>
                                                 {{ match($it->metodo_pago) { 'tarjeta' => '💳', 'transferencia' => '🏦', 'efectivo' => '💵', default => '' } }}
                                                 {{ ucfirst($it->metodo_pago) }}
@@ -395,20 +400,13 @@
                                             <span class="text-xs text-gray-300">—</span>
                                         @endif
                                     </td>
-
-                                    {{-- Columna retenciones — solo si la requisición tiene retenciones --}}
                                     @if($hayRetenciones)
                                     <td class="px-4 py-3 text-right">
                                         @if(($it->monto_retenciones ?? 0) > 0)
-                                            <div class="text-xs font-semibold text-rose-600">
-                                                - ${{ number_format($it->monto_retenciones, 2) }}
-                                            </div>
-                                            {{-- Detalle de cada retención --}}
+                                            <div class="text-xs font-semibold text-rose-600">- ${{ number_format($it->monto_retenciones, 2) }}</div>
                                             @foreach($it->retenciones as $ret)
                                                 @if($ret->tipoRetencion)
-                                                <div class="text-[10px] text-rose-400 mt-0.5">
-                                                    {{ $ret->tipoRetencion->nombre }}
-                                                </div>
+                                                <div class="text-[10px] text-rose-400 mt-0.5">{{ $ret->tipoRetencion->nombre }}</div>
                                                 @endif
                                             @endforeach
                                         @else
@@ -416,24 +414,64 @@
                                         @endif
                                     </td>
                                     @endif
-
-                                    {{-- Total: si hay retenciones muestra total_neto, si no total_item --}}
                                     <td class="px-4 py-3 text-sm text-right">
                                         @if(($it->monto_retenciones ?? 0) > 0)
-                                            <div class="font-bold text-gray-800">
-                                                ${{ number_format($it->total_neto, 2) }}
-                                            </div>
+                                            <div class="font-bold text-gray-800">${{ number_format($it->total_neto, 2) }}</div>
                                             <div class="text-[10px] text-gray-400">neto</div>
                                         @else
-                                            <span class="font-bold text-gray-800">
-                                                ${{ number_format($it->total_item ?: $it->subtotal, 2) }}
-                                            </span>
+                                            <span class="font-bold text-gray-800">${{ number_format($it->total_item ?: $it->subtotal, 2) }}</span>
                                         @endif
                                     </td>
+
+                                    {{-- ✅ COLUMNA ENTREGADO --}}
+                                    @if($mostrarColEntregado)
+                                    <td class="px-4 py-3 text-center">
+                                        @if($puedeToggle)
+                                            {{-- Compras/admin en aprobada_final: botón interactivo --}}
+                                            <form method="POST" action="{{ route('requisiciones.items.toggle-entregado', $it) }}" class="inline">
+                                                @csrf @method('PATCH')
+                                                <button type="submit"
+                                                        title="{{ $it->entregado ? 'Desmarcar entregado' : 'Marcar como entregado' }}"
+                                                        class="inline-flex items-center justify-center w-8 h-8 rounded-full transition-all
+                                                               {{ $it->entregado
+                                                                   ? 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200'
+                                                                   : 'bg-gray-100 text-gray-300 hover:bg-gray-200 hover:text-gray-500' }}">
+                                                    @if($it->entregado)
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                                                        </svg>
+                                                    @else
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                                                        </svg>
+                                                    @endif
+                                                </button>
+                                            </form>
+                                        @else
+                                            {{-- Solicitante y otros: solo lectura --}}
+                                            <span class="inline-flex items-center justify-center w-8 h-8 rounded-full
+                                                         {{ $it->entregado ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-300' }}">
+                                                @if($it->entregado)
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                                                    </svg>
+                                                @else
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                    </svg>
+                                                @endif
+                                            </span>
+                                        @endif
+                                        @if($it->entregado && $it->entregado_en)
+                                            <p class="text-[9px] text-emerald-500 mt-0.5">{{ $it->entregado_en->format('d/m H:i') }}</p>
+                                        @endif
+                                    </td>
+                                    @endif
+
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="{{ $hayRetenciones ? 10 : 9 }}"
+                                    <td colspan="{{ $hayRetenciones ? ($mostrarColEntregado ? 11 : 10) : ($mostrarColEntregado ? 10 : 9) }}"
                                         class="px-4 py-8 text-sm text-center text-gray-400">
                                         Sin partidas registradas.
                                     </td>
@@ -443,7 +481,6 @@
                     </table>
                 </div>
 
-                {{-- Totales --}}
                 <div class="flex justify-end px-5 py-4 border-t border-gray-100 bg-gray-50">
                     <div class="w-full max-w-xs space-y-2">
                         <div class="flex justify-between text-sm text-gray-500">
@@ -475,40 +512,32 @@
                     </div>
                 </div>
             </div>
-            {{-- ══ OC NETSUITE (solo compras/admin, desde aprobada_final en adelante) ══ --}}
+
+            {{-- OC NETSUITE --}}
             @if(Auth::user()->hasAnyRole(['compras', 'administrador']) &&
                 in_array($requisicion->estado, ['aprobada_final', 'pendiente_cierre', 'recibida']))
-            <div class="bg-white rounded-xl shadow-sm border border-indigo-100 overflow-hidden">
+            <div class="overflow-hidden bg-white border border-indigo-100 shadow-sm rounded-xl">
                 <div class="flex items-center gap-2 px-5 py-3 border-b border-indigo-100 bg-indigo-50">
                     <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
                     </svg>
-                    <h3 class="text-xs font-bold text-indigo-700 uppercase tracking-widest">OC Netsuite</h3>
+                    <h3 class="text-xs font-bold tracking-widest text-indigo-700 uppercase">OC Netsuite</h3>
                     <span class="text-[10px] text-indigo-400 font-normal ml-1">— Uso interno Compras</span>
                 </div>
                 <div class="p-5">
                     @if(session('oc_guardado'))
-                        <div class="flex items-center gap-2 p-3 mb-3 text-sm font-medium text-emerald-800 border border-emerald-200 rounded-lg bg-emerald-50">
+                        <div class="flex items-center gap-2 p-3 mb-3 text-sm font-medium border rounded-lg text-emerald-800 border-emerald-200 bg-emerald-50">
                             ✅ OC Netsuite guardada correctamente.
                         </div>
                     @endif
-
-                    <form method="POST" action="{{ route('requisiciones.oc-netsuite', $requisicion) }}"
-                        class="flex items-end gap-3">
+                    <form method="POST" action="{{ route('requisiciones.oc-netsuite', $requisicion) }}" class="flex items-end gap-3">
                         @csrf @method('PATCH')
                         <div class="flex-1">
-                            <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                                Número de OC en Netsuite
-                            </label>
-                            <input type="text"
-                                name="oc_netsuite"
-                                value="{{ old('oc_netsuite', $requisicion->oc_netsuite) }}"
-                                placeholder="Ej. OC-2026-00123"
-                                class="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500
-                                        @error('oc_netsuite') border-red-400 @enderror">
-                            @error('oc_netsuite')
-                                <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
-                            @enderror
+                            <label class="block mb-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Número de OC en Netsuite</label>
+                            <input type="text" name="oc_netsuite"
+                                   value="{{ old('oc_netsuite', $requisicion->oc_netsuite) }}"
+                                   placeholder="Ej. OC-2026-00123"
+                                   class="w-full text-sm border-gray-200 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
                         </div>
                         <button type="submit"
                                 class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-white rounded-lg shadow-sm hover:shadow-md transition-all"
@@ -519,17 +548,14 @@
                             Guardar
                         </button>
                     </form>
-
                     @if($requisicion->oc_netsuite)
-                    <p class="mt-2 text-xs text-gray-400">
-                        OC actual: <span class="font-semibold text-indigo-700">{{ $requisicion->oc_netsuite }}</span>
-                    </p>
+                    <p class="mt-2 text-xs text-gray-400">OC actual: <span class="font-semibold text-indigo-700">{{ $requisicion->oc_netsuite }}</span></p>
                     @endif
                 </div>
             </div>
             @endif
 
-            {{-- ══ CADENA DE APROBACIONES ══════════════════════════════ --}}
+            {{-- CADENA DE APROBACIONES --}}
             <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-xl">
                 <div class="flex items-center gap-2 px-5 py-3 border-b border-gray-100"
                      style="background: linear-gradient(90deg, #4A1660 0%, #6d28d9 100%);">
@@ -590,15 +616,88 @@
                     @endif
                 </div>
             </div>
+            {{-- ══ HISTORIAL DE ACTIVIDAD ════════════════════════════════════════ --}}
+            @if($requisicion->actividades->count() > 0)
+            <div class="overflow-hidden bg-white border border-gray-100 shadow-sm rounded-xl">
+                <div class="flex items-center gap-2 px-5 py-3 border-b border-gray-100"
+                    style="background: linear-gradient(90deg, #4A1660 0%, #6d28d9 100%);">
+                    <svg class="w-4 h-4 text-white/70" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <h3 class="text-xs font-bold tracking-widest text-white uppercase">Historial de actividad</h3>
+                    <span class="ml-auto text-[10px] text-white/50">{{ $requisicion->actividades->count() }} evento(s)</span>
+                </div>
+                <div class="p-5">
+                    <div class="relative">
+                        {{-- Línea vertical --}}
+                        <div class="absolute left-3.5 top-0 bottom-0 w-px bg-gray-100"></div>
+            
+                        <ul class="space-y-4">
+                            @foreach($requisicion->actividades->sortByDesc('created_at') as $act)
+                            <li class="relative flex items-start gap-4">
+                                {{-- Ícono del evento --}}
+                                <div class="flex items-center justify-center w-7 h-7 rounded-full shrink-0 z-10 border-2 text-sm
+                                            {{ $act->color }}"
+                                    style="background: white;">
+                                    {{ $act->icono }}
+                                </div>
+            
+                                {{-- Contenido --}}
+                                <div class="flex-1 min-w-0 pt-0.5">
+                                    <div class="flex items-start justify-between gap-3">
+                                        <div class="min-w-0">
+                                            <p class="text-sm font-medium text-gray-800">{{ $act->descripcion }}</p>
+                                            @if($act->user)
+                                            <p class="text-xs text-gray-400 mt-0.5">
+                                                por <span class="font-medium text-gray-600">{{ $act->user->name }}</span>
+                                            </p>
+                                            @endif
+                                            {{-- Cambio de estado --}}
+                                            @if($act->estado_anterior && $act->estado_nuevo)
+                                            <div class="flex items-center gap-1.5 mt-1">
+                                                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-500">
+                                                    {{ $act->estado_anterior }}
+                                                </span>
+                                                <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                                                </svg>
+                                                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold"
+                                                    style="background: {{ $act->color_linea }}22; color: {{ $act->color_linea }}">
+                                                    {{ $act->estado_nuevo }}
+                                                </span>
+                                            </div>
+                                            @endif
+                                            {{-- Metadata extra --}}
+                                            @if($act->metadata && isset($act->metadata['oc_netsuite']))
+                                            <p class="mt-1 font-mono text-xs text-teal-600">{{ $act->metadata['oc_netsuite'] }}</p>
+                                            @endif
+                                        </div>
+                                        <span class="text-[10px] text-gray-400 shrink-0 whitespace-nowrap">
+                                            {{ $act->created_at->format('d/m/Y') }}<br>
+                                            <span class="text-gray-300">{{ $act->created_at->format('h:i A') }}</span>
+                                        </span>
+                                    </div>
+                                </div>
+                            </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            @endif
 
-            {{-- ══ COMPONENTE APROBAR ══════════════════════════════════ --}}
+            {{-- APROBAR --}}
             @if($puedeFirmar && $requisicion->estado === 'en_aprobacion')
                 <livewire:requisiciones.aprobar :requisicion="$requisicion" />
             @endif
 
-            {{-- ══ ACCIÓN RECIBIR ══════════════════════════════════════ --}}
+            {{-- RECIBIR --}}
             @can('receive', $requisicion)
                 @if($requisicion->estado === 'aprobada_final')
+                    @php
+                        $todosEntregadosShow = $totalItems > 0 && $totalEntregados === $totalItems;
+                    @endphp
+                    @if($todosEntregadosShow)
                     <div class="flex justify-end">
                         <a href="{{ route('requisiciones.recibir', $requisicion) }}"
                            class="inline-flex items-center gap-2 px-6 py-3 text-sm font-semibold text-white transition-all shadow-lg rounded-xl hover:shadow-xl"
@@ -609,6 +708,16 @@
                             Registrar recepción
                         </a>
                     </div>
+                    @else
+                    <div class="flex justify-end">
+                        <div class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-400 bg-gray-100 border border-gray-200 rounded-xl">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                            </svg>
+                            Esperando confirmación de entrega por Compras
+                        </div>
+                    </div>
+                    @endif
                 @endif
             @endcan
 

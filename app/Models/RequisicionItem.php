@@ -19,6 +19,9 @@ class RequisicionItem extends Model
         'subtotal',
         'link_compra',
         'proveedor_sugerido',
+        'entregado',
+        'entregado_en',
+        'entregado_por_id',
         'ficha_tecnica_path',
         'ficha_tecnica_nombre',
         'unidad_medida_id',
@@ -43,10 +46,16 @@ class RequisicionItem extends Model
         'total_item'       => 'decimal:2',
         'monto_retenciones' => 'decimal:2',
         'total_neto'        => 'decimal:2',
+        'entregado'    => 'boolean',
+        'entregado_en' => 'datetime',
     ];
 
     // ─── Relaciones ───────────────────────────────────────────────────────────
-
+    public function entregadoPor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'entregado_por_id');
+    }
+    
     public function requisicion(): BelongsTo
     {
         return $this->belongsTo(Requisicion::class);

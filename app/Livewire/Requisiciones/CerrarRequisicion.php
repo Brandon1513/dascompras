@@ -2,7 +2,9 @@
 
 namespace App\Livewire\Requisiciones;
 
+use App\Models\NotificacionInterna;
 use App\Models\Requisicion;
+use App\Models\RequisicionActividad;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -246,21 +248,17 @@ class CerrarRequisicion extends Component
     {
         $this->tiene_factura = true;
         $this->validate($this->rulesConFactura(), $this->messages());
-
+ 
         DB::transaction(function () {
             $path   = $this->factura_compras_path;
             $nombre = $this->factura_compras_nombre;
-
-            // Solo guardar nueva ruta si se subió un archivo nuevo
             if ($this->factura_compras_nueva) {
-                // Borrar solo si hay una factura de compras previa (no la del solicitante)
                 if ($path && !$this->facturaEsDelSolicitante) {
                     Storage::disk('public')->delete($path);
                 }
                 $nombre = $this->factura_compras_nueva->getClientOriginalName();
                 $path   = $this->factura_compras_nueva->store('requisiciones/facturas_compras', 'public');
             }
-
             $this->requisicion->update([
                 'estado'                 => 'recibida',
                 'tiene_factura'          => true,
@@ -271,11 +269,31 @@ class CerrarRequisicion extends Component
                 'cerrado_por_id'         => Auth::id(),
                 'cerrado_en'             => now(),
             ]);
+ 
+            // Actividad
+            RequisicionActividad::registrar(
+                $this->requisicion->id,
+                'cerrada',
+                "Cerrada con factura" . ($this->uuid_factura ? ". UUID: {$this->uuid_factura}" : '.'),
+                null, 'pendiente_cierre', 'recibida',
+                ['uuid' => $this->uuid_factura ?: null, 'tiene_factura' => true]
+            );
         });
-
+ 
+        // Notificación interna al solicitante
+        NotificacionInterna::enviar(
+            $this->requisicion->solicitante_id,
+            'cerrada',
+            "🔒 Tu requi {$this->requisicion->folio} fue cerrada",
+            'Proceso completado con factura.',
+            route('requisiciones.show', $this->requisicion),
+            $this->requisicion->id
+        );
+ 
         session()->flash('status', 'Requisición cerrada correctamente con factura adjunta.');
         $this->js("window.location.href = '" . route('requisiciones.index') . "'");
     }
+
 
     // ── Cerrar SIN factura ────────────────────────────────────────────────
 
@@ -283,7 +301,7 @@ class CerrarRequisicion extends Component
     {
         $this->tiene_factura = false;
         $this->validate($this->rulesSinFactura(), $this->messages());
-
+ 
         DB::transaction(function () {
             $this->requisicion->update([
                 'estado'         => 'recibida',
@@ -293,8 +311,27 @@ class CerrarRequisicion extends Component
                 'cerrado_por_id' => Auth::id(),
                 'cerrado_en'     => now(),
             ]);
+ 
+            // Actividad
+            RequisicionActividad::registrar(
+                $this->requisicion->id,
+                'cerrada',
+                'Cerrada sin factura.',
+                null, 'pendiente_cierre', 'recibida',
+                ['tiene_factura' => false]
+            );
         });
-
+ 
+        // Notificación interna al solicitante
+        NotificacionInterna::enviar(
+            $this->requisicion->solicitante_id,
+            'cerrada',
+            "🔒 Tu requi {$this->requisicion->folio} fue cerrada",
+            'Proceso completado sin factura.',
+            route('requisiciones.show', $this->requisicion),
+            $this->requisicion->id
+        );
+ 
         session()->flash('status', 'Requisición cerrada sin factura. Se registró para el reporte.');
         $this->js("window.location.href = '" . route('requisiciones.index') . "'");
     }

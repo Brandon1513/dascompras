@@ -206,6 +206,21 @@
                     {{ Auth::user()->getRoleNames()->first() ?? 'usuario' }}
                 </span>
 
+                {{-- Campana de notificaciones --}}
+                {{-- Campana estática con badge --}}
+                <a href="{{ route('notificaciones.index') }}"
+                class="relative flex items-center justify-center transition-all w-9 h-9 rounded-xl text-white/60 hover:text-white hover:bg-white/10">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                    </svg>
+                    @php $noLeidas = \App\Models\NotificacionInterna::where('user_id', auth()->id())->where('leida', false)->count(); @endphp
+                    @if($noLeidas > 0)
+                    <span class="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-black text-white bg-rose-500 rounded-full">
+                        {{ $noLeidas > 9 ? '9+' : $noLeidas }}
+                    </span>
+                    @endif
+                </a>
+
                 <div class="relative" x-data="{ open: false }" @mouseenter="open = true" @mouseleave="open = false">
                     <button class="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-xl border transition-all duration-150 hover:bg-white/10"
                             style="background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.12);">

@@ -3,7 +3,9 @@
 namespace App\Livewire\Requisiciones;
 
 use App\Models\Aprobacion;
+use App\Models\NotificacionInterna;
 use App\Models\Requisicion;
+use App\Models\RequisicionActividad;
 use App\Models\RequisicionItem;
 use App\Models\RequisicionItemArchivo;
 use App\Models\TipoImpuesto;
@@ -255,58 +257,71 @@ class RevisarRequisicion extends Component
     // ─── Aprobar revisión ─────────────────────────────────────────────────
 
     public function aprobarRevision(): void
-    {
-        $this->validate([
-            'observaciones_compras' => ['nullable', 'string', 'max:2000'],
-        ]);
-
-        try {
-            DB::transaction(function () {
-                $this->recalcularTotales();
-
-                $this->requisicion->update([
-                    'observaciones_compras' => $this->observaciones_compras ?: null,
-                    'metodo_pago'           => $this->metodo_pago,
-                    'subtotal'              => $this->subtotal,
-                    'iva'                   => $this->total_impuestos,
-                    'total'                 => $this->total,
-                    'estado'                => 'aprobada_compras',
-                    'revisado_por_id'       => Auth::id(),
-                    'revisado_en'           => now(),
+{
+    $this->validate([
+        'observaciones_compras' => ['nullable', 'string', 'max:2000'],
+    ]);
+    try {
+        DB::transaction(function () {
+            $this->recalcularTotales();
+            $this->requisicion->update([
+                'observaciones_compras' => $this->observaciones_compras ?: null,
+                'metodo_pago'           => $this->metodo_pago,
+                'subtotal'              => $this->subtotal,
+                'iva'                   => $this->total_impuestos,
+                'total'                 => $this->total,
+                'estado'                => 'aprobada_compras',
+                'revisado_por_id'       => Auth::id(),
+                'revisado_en'           => now(),
+            ]);
+            foreach ($this->items as $row) {
+                $item = RequisicionItem::find($row['id']);
+                if (!$item) continue;
+                $item->update([
+                    'precio_unitario'    => (float) $row['precio_unitario'],
+                    'tipo_impuesto_id'   => $row['tipo_impuesto_id'] ?: null,
+                    'monto_impuesto'     => (float) ($row['monto_impuesto'] ?? 0),
+                    'total_item'         => (float) ($row['total_item'] ?? 0),
+                    'subtotal'           => (float) ($row['subtotal'] ?? 0),
+                    'proveedor_sugerido' => $row['proveedor_sugerido'] ?: null,
+                    'link_compra'        => $row['link_compra'] ?: null,
+                    'metodo_pago'        => $row['metodo_pago'] ?: null,
+                    'total_neto'         => (float) ($row['total_neto'] ?? $row['total_item'] ?? 0),
                 ]);
+            }
+            $flujo = app(FlujoAprobacionService::class);
+            $flujo->crearCadenaAprobacion($this->requisicion);
+            $this->requisicion->update(['estado' => 'en_aprobacion']);
+            $flujo->notificarSiguiente($this->requisicion->fresh());
+ 
+            // ← Actividad DENTRO del transaction
+            RequisicionActividad::registrar(
+                $this->requisicion->id,
+                'revisada',
+                'Aprobada por Compras y enviada a aprobaciones.',
+                null,
+                'en_revision_compras',
+                'en_aprobacion'
+            );
+            NotificacionInterna::enviar(
+            $this->requisicion->solicitante_id,
+            'revision',
+            "Tu requi {$this->requisicion->folio} fue aprobada por Compras",
+            'Pasó al flujo de aprobaciones y está en proceso.',
+            route('requisiciones.show', $this->requisicion),
+            $this->requisicion->id
+            );
 
-                foreach ($this->items as $row) {
-                    $item = RequisicionItem::find($row['id']);
-                    if (!$item) continue;
-
-                    $item->update([
-                        'precio_unitario'    => (float) $row['precio_unitario'],
-                        'tipo_impuesto_id'   => $row['tipo_impuesto_id'] ?: null,
-                        'monto_impuesto'     => (float) ($row['monto_impuesto'] ?? 0),
-                        'total_item'         => (float) ($row['total_item'] ?? 0),
-                        'subtotal'           => (float) ($row['subtotal'] ?? 0),
-                        'proveedor_sugerido' => $row['proveedor_sugerido'] ?: null,
-                        'link_compra'        => $row['link_compra'] ?: null,
-                        'metodo_pago'        => $row['metodo_pago'] ?: null,
-                        'total_neto'         => (float) ($row['total_neto'] ?? $row['total_item'] ?? 0),
-                    ]);
-                }
-
-                $flujo = app(FlujoAprobacionService::class);
-                $flujo->crearCadenaAprobacion($this->requisicion);
-
-                $this->requisicion->update(['estado' => 'en_aprobacion']);
-                $flujo->notificarSiguiente($this->requisicion->fresh());
-            });
-
-            session()->flash('status', 'Revisión aprobada. La requisición continúa al flujo de aprobaciones.');
-            $this->js("window.location.href = '" . route('requisiciones.index') . "'");
-
-        } catch (\Exception $e) {
-            \Log::error('aprobarRevision error: ' . $e->getMessage());
-            $this->addError('general', 'Error al aprobar: ' . $e->getMessage());
-        }
+        });
+ 
+        session()->flash('status', 'Revisión aprobada. La requisición continúa al flujo de aprobaciones.');
+        $this->js("window.location.href = '" . route('requisiciones.index') . "'");
+    } catch (\Exception $e) {
+        \Log::error('aprobarRevision error: ' . $e->getMessage());
+        $this->addError('general', 'Error al aprobar: ' . $e->getMessage());
     }
+}
+
 
     // ─── Rechazar revisión ────────────────────────────────────────────────
 
@@ -317,29 +332,50 @@ class RevisarRequisicion extends Component
     }
 
     public function rechazarRevision(): void
-    {
-        $this->validate([
-            'motivo_rechazo' => ['required', 'string', 'min:10', 'max:1000'],
-        ], [
-            'motivo_rechazo.required' => 'Debes indicar el motivo del rechazo.',
-            'motivo_rechazo.min'      => 'El motivo debe tener al menos 10 caracteres.',
+{
+    $this->validate([
+        'motivo_rechazo' => ['required', 'string', 'min:10', 'max:1000'],
+    ], [
+        'motivo_rechazo.required' => 'Debes indicar el motivo del rechazo.',
+        'motivo_rechazo.min'      => 'El motivo debe tener al menos 10 caracteres.',
+    ]);
+ 
+    DB::transaction(function () {
+        $this->requisicion->update([
+            'estado'                 => 'rechazada_compras',
+            'motivo_rechazo_compras' => $this->motivo_rechazo,
+            'revisado_por_id'        => Auth::id(),
+            'revisado_en'            => now(),
         ]);
+ 
+        // ← Actividad DENTRO del transaction
+        RequisicionActividad::registrar(
+            $this->requisicion->id,
+            'rechazada_compras',
+            "Rechazada por Compras: {$this->motivo_rechazo}",
+            null,
+            'en_revision_compras',
+            'rechazada_compras'
+        );
+        NotificacionInterna::enviar(
+        $this->requisicion->solicitante_id,
+        'rechazada_compras',
+        "Tu requi {$this->requisicion->folio} fue rechazada por Compras",
+        "Motivo: {$this->motivo_rechazo}",
+        route('requisiciones.edit', $this->requisicion),
+        $this->requisicion->id
+        );
 
-        DB::transaction(function () {
-            $this->requisicion->update([
-                'estado'                 => 'rechazada_compras',
-                'motivo_rechazo_compras' => $this->motivo_rechazo,
-                'revisado_por_id'        => Auth::id(),
-                'revisado_en'            => now(),
-            ]);
-        });
+    });
+ 
+    optional($this->requisicion->solicitante)
+        ->notify(new RequisicionRechazadaPorCompras($this->requisicion, $this->motivo_rechazo));
+ 
+    session()->flash('status', 'Requisición rechazada. Se notificó al solicitante.');
+    $this->js("window.location.href = '" . route('requisiciones.index') . "'");
+}
 
-        optional($this->requisicion->solicitante)
-            ->notify(new RequisicionRechazadaPorCompras($this->requisicion, $this->motivo_rechazo));
-
-        session()->flash('status', 'Requisición rechazada. Se notificó al solicitante.');
-        $this->js("window.location.href = '" . route('requisiciones.index') . "'");
-    }
+    
 
     // ─── Helper archivos ──────────────────────────────────────────────────
 

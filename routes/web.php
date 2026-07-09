@@ -1,32 +1,44 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Livewire\Requisiciones\Recibir;
-use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\EmpleadoController;
-use App\Http\Controllers\RequisicionController;
-use App\Http\Controllers\ExpedienteWebController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartamentoGerenteController;
-use App\Http\Controllers\UnidadMedidaController;
-use App\Http\Controllers\TipoImpuestoController;
-use App\Livewire\Requisiciones\CerrarRequisicion;
-use App\Http\Controllers\TipoRetencionController;
+use App\Http\Controllers\EmpleadoController;
+use App\Http\Controllers\ExpedienteWebController;
+use App\Http\Controllers\NotificacionesController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\RequisicionController;
 use App\Http\Controllers\RequisicionExportController;
-
+use App\Http\Controllers\TipoImpuestoController;
+use App\Http\Controllers\TipoRetencionController;
+use App\Http\Controllers\UnidadMedidaController;
+use App\Livewire\Requisiciones\CerrarRequisicion;
+use App\Livewire\Requisiciones\Recibir;
 use App\Livewire\Requisiciones\RevisarRequisicion;
+use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     return view('welcome');
 });
 
-Route::get('/dashboard', function () {
-    return view('dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
+Route::get('/dashboard', [DashboardController::class, 'index'])
+    ->middleware(['auth', 'verified'])
+    ->name('dashboard');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    Route::prefix('notificaciones')->name('notificaciones.')->group(function () {
+    Route::get('/',                                        [NotificacionesController::class, 'index'])->name('index');
+    Route::patch('/{notificacion}/leida',                  [NotificacionesController::class, 'marcarLeida'])->name('leida');
+    Route::patch('/todas-leidas',                          [NotificacionesController::class, 'marcarTodasLeidas'])->name('todas-leidas');
+    Route::delete('/{notificacion}/eliminar',              [NotificacionesController::class, 'eliminar'])->name('eliminar');
+    Route::delete('/eliminar-todas',                       [NotificacionesController::class, 'eliminarTodas'])->name('eliminar-todas');
 });
+});
+
+
+
 
 //empleados
 
@@ -125,6 +137,8 @@ Route::middleware(['auth'])->group(function () {
      ->middleware('role:compras|administrador');
 
      Route::patch('/requisiciones/{requisicion}/oc-netsuite', [RequisicionController::class, 'guardarOcNetsuite'])->name('requisiciones.oc-netsuite');
+
+     Route::patch('/requisiciones/items/{item}/toggle-entregado', [RequisicionController::class, 'toggleEntregado'])->name('requisiciones.items.toggle-entregado');
  
     // ── Ruta dinámica SIEMPRE AL FINAL ───────────────────────
     Route::get('/requisiciones/{requisicion}',

@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use Livewire\WithFileUploads;
 use Illuminate\Support\Facades\Storage;
+use App\Models\RequisicionActividad;
 
 class RequisicionForm extends Component
 {
@@ -416,6 +417,13 @@ class RequisicionForm extends Component
     public function saveDraft(): void
     {
         $this->persist('borrador');
+
+        RequisicionActividad::registrar(
+        $this->requisicion->id,
+        'editada',
+        'Requisición editada y guardada como borrador.'
+        );
+
         session()->flash('status', 'Requisición guardada en borrador.');
         $this->js("window.location.href = '" . route('requisiciones.index') . "'");
     }
@@ -427,6 +435,15 @@ class RequisicionForm extends Component
 
             User::role('compras')->get()
                 ->each(fn(User $u) => $u->notify(new RequisicionEnRevisionCompras($req, false)));
+                
+            RequisicionActividad::registrar(
+                $req->id,
+                'enviada',
+                'Enviada a revisión de Compras.',
+                null,
+                'borrador',
+                'en_revision_compras'
+            );
 
             session()->flash('status', 'Requisición enviada a revisión del área de Compras.');
             $this->js("window.location.href = '" . route('requisiciones.index') . "'");
