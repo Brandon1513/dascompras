@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ExpedienteApiController;
 use App\Http\Controllers\Api\CargaExpedienteApiController;
-
+use App\Http\Controllers\Api\RequisicionApiController;
 
 
 // Autenticación API (Sanctum)
@@ -38,4 +38,9 @@ Route::middleware(['auth:sanctum','active','role:administrador|compras'])->group
     Route::get('/expedientes', [ExpedienteApiController::class, 'index']);
     Route::get('/expedientes/{expediente}', [ExpedienteApiController::class, 'show'])
         ->whereNumber('expediente');
+});
+
+
+Route::middleware(['auth:sanctum','active','role:administrador|compras'])->group(function () {
+    Route::get('/requisiciones', [RequisicionApiController::class, 'index']);
 });
